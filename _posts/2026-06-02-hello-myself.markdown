@@ -1,15 +1,14 @@
 ---
-layout:     post
+layout:     page
 title:      "Welcome to Omnivored Blog"
 subtitle:   " \"Hello World, Hello Blog\""
-date:       2026-06-03 17:22:00
+date:       2026-06-02 17:22:00
 author:     "Omnivored"
 header-img: "img/2026_hello_page.jpeg"
 tags:
     - 打招呼
 ---
 
-> “Yeah It's on. ”
 # 👋你好👋
 终于把博客开通了。
 之前在各个笔记平台写文档，用途完全混在一起，文档也是东一榔头西一棒槌地存，一直想搞一个博客网站，搜了一些教程最后也没有成功实践。
