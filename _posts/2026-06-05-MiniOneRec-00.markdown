@@ -1,0 +1,604 @@
+---
+layout:     page
+title:      "OneRec Series"
+subtitle:   " \"MiniOneRec 完整知识体系\""
+date:       2026-06-05 12:55:00
+author:     "Omnivored"
+header-img: "img/2026_hello_page.jpeg"
+tags:
+    - MiniOneRec
+---
+# MiniOneRec 完整知识体系
+
+> 使用Deepseekv4整合了 `00 minionerec知识点.md` 和 `03 源码学习疑问记录.md` 的零散内容，按照 MiniOneRec 整体架构（SID构建 → SFT → RL）重新组织。重要性从高到低排列。但是明显很多我需要的知识点被删掉或者简化了，需要我手动补充。
+总之，先上传blog，督促我后续尽快完善。
+
+---
+
+# 一、整体概览
+
+## 1.1 生成式推荐范式
+
+- **核心思想**：将推荐问题转化为**预测下一串离散语义ID（SID）** 的自回归生成任务，替代传统"召回+排序"两阶段范式
+- **要解决的关键问题**：
+  1. 如何将商品变成 token（SID）
+  2. 如何将预测出的 next-token 对应到真实商品
+
+### 与传统推荐对比
+
+| 维度 | 传统推荐 | MiniOneRec 生成式推荐 |
+|------|----------|----------------------|
+| 核心组件 | 召回+排序+重排，割裂优化 | 单一生成模型，端到端优化 |
+| 物品表示 | 稠密 embedding，独立存储 | 多层离散 SID，与模型参数融合 |
+| 扩展能力 | 随物品规模增大效果饱和 | 符合 Scaling Law，参数越多效果越好 |
+| 推理方式 | 相似度匹配 | 自回归生成，可利用上下文语义 |
+
+### 优势
+
+- 消除超大 embedding 表，降低存储与更新成本
+- 统一召回与排序，实现端到端优化
+- 引入 LLM 世界知识与推理能力
+
+## 1.2 MiniOneRec 定位
+
+作为快手 OneRec 的学术开源版，验证了生成式推荐的 **Scaling Law**（模型性能随参数规模增长持续提升），并解决传统推荐系统中超大 embedding 表 + 召回/排序割裂的扩展瓶颈。
+
+### 三大模块总览
+
+**SID构建 → 监督微调（SFT） → 推荐强化学习（RL）**
+
+1. **SID 构建**：将每个商品转换为紧凑的、具有语义意义的 token。连接商品的 title 和 description，输入冻结的 text encoder，然后用三级 RQ-VAE 量化生成的 embedding。
+2. **SFT**：将按时间顺序排列的用户历史视为 token 序列，通过 next-token prediction 学习生成用户可能消费的下一个商品的 SID。**此阶段与一组语言对齐目标共同训练**，在自然语言和 SID 空间之间进行映射。
+3. **面向推荐的 RL**：通过基于 GRPO 的强化学习进一步优化。为每个 prompt 生成多个候选推荐，在组内标准化 rewards，KL penalty 使更新后的 policy 保持接近其 reference。使用 constrained beam search 保证每个 beam 唯一且有效。
+
+---
+
+# 二、模块一：SID 构建（Semantic ID Construction）
+
+> 将物品映射为紧凑离散语义表示，是生成式推荐的基础。
+
+## 2.1 实现流程（高重要性）
+
+1. **物品文本处理**：拼接商品标题 + 描述，生成输入文本
+2. **文本编码**：通过**冻结的预训练文本编码器**（如 BERT）生成稠密 embedding
+3. **量化编码**：通过 RQ-VAE 将稠密 embedding 映射为多层离散 SID（3 层 × 256 码本大小）
+4. **SID 存储**：建立物品 ID 与 SID 的映射表，用于后续训练与推理
+
+### 商品 → token（SID）的本质
+
+稠密的文本特征 → 离散的 ID 表达，并且控制词表大小。从用户历史序列中挖掘 ID 与 ID 的序列关系，ID 本身就是语义信息，LLM 本身对于自然语言的理解，所以自然地达成了**跨模态的推荐效果**。【将语义和时序信息都放进 prompt】
+
+## 2.2 RQ-VAE（残差量化变分自编码器）【高重要性】
+
+- **结构**：编码器 → 多层码本（残差连接）→ 解码器
+- **损失**：重建损失 + 每层码本损失 + 承诺损失
+- **优势**：相比 VQ-VAE，通过残差连接缓解码本坍塌问题
+- **码本大小**：`num_emb_list = [256, 256, 256]`，共 768 个独立 token
+
+### 梯度直通估计器（STE）
+
+在 RQ-VAE 量化过程中，解决离散量化操作不可导问题。**前向传播使用量化值，反向传播时直接传递梯度到编码器输出**，避免梯度消失。
+
+### 其他可选算法
+
+- **RQ-Kmeans**：基于 Kmeans 的残差量化，计算效率更高
+- **RQ-VAE-v2（PLUM）**：Google 最新量化算法
+- **RQ-OPQ**：正交乘积量化，进一步压缩 SID 长度
+
+## 2.3 TokenExtender 类 【中重要性】
+
+SFT 阶段需要**将 SID 的 token 集合添加进 tokenizer**。
+
+### 功能
+
+- 从 `index.json` 收集所有商品使用的 SID token
+- 将这些 token 添加到 tokenizer 词汇表中
+- 扩展模型的 embedding 层以容纳新 token
+- **只解冻新 token 的 embedding 参数进行训练**（Freezing LLM parameters, only training new token embeddings）
+
+### 为何从 index.json 而非全部码本收集？
+
+对本项目而言，train/test/eval 都使用 Amazon 数据集，没有新的 item id，所以 `index.json` 就够用。但存在隐患——如果推理时遇到新商品被分配到未使用的码本索引，tokenizer 无法处理。
+
+> **【待补充】**
+> 对于此问题的完整解决方案（如动态扩充 tokenizer 或预留码本空间）目前未完整阐述。
+
+### 三层 SID 的 token 化
+
+三层 SID 例如 `<a_123><b_80><c_124>`，分词器将其拆分为多个 token（具体每个 `<a_123>` 整体被分词器编码为几个 token 取决于 tokenizer 的分词粒度）。
+
+> **【待补充】**
+> `<a_123>` 具体被拆分为几个 token？其 token id 序列长度是多少？
+
+## 2.4 码本坍塌（Codebook Collapse）【中重要性】
+
+聚类算法可能导致部分码本索引**从未被任何商品使用**，即某些 `<a_X><b_Y><c_Z>` 组合不存在于训练数据中。
+
+### 对本项目的影响
+
+本项目在 Amazon 小体量数据集上进行，影响不明显。但用于其他场景时必须考虑缓解策略。
+
+### RQ-VAE 本身的缓解机制
+
+- **残差连接**：每层码本只学习前一层的残差，降低码本学习难度
+- **温度系数调整**：训练初期高温度促进码本探索，后期降低温度稳定码本分配
+- **碰撞率监控**：实时监测码本使用情况
+
+### 关于 SK（Soft Kmeans）的说明
+
+> **【待补充】**
+> 文档中仅提及 SK 的设计意图（训练时使用 SK 追求码本平衡，生成时默认不使用 SK 追求速度，碰撞时使用 SK 作为后处理手段），但对 SK 的具体实现机制和与本项目 RQ-VAE 的关系未完整阐述。
+
+> **【待补充 · 源文档未解答】**
+> OneRec / MiniOneRec 或其他使用 SID 的生成式推荐算法如何系统性地应对码本坍塌现象？
+
+## 2.5 SID 使用的 LLM 模型
+
+SID 构建时加载 LLM 的方式与后续 SFT/RL 不同：
+- **SID 阶段**：`AutoModel.from_pretrained()`，取 LLM 最后一层 hidden_state 作为输出（语义向量），使用**双向 MHA**（无因果 mask）
+- **SFT/RL 阶段**：`AutoModelForCausalLM.from_pretrained()`，目的是 next-token prediction，使用**因果 MHA**（加 mask 保证历史 token 看不到未来 token）
+
+> **【待补充】**
+> 项目中 SFT 使用的具体模型名称为：_____
+> 项目中 RL 使用的具体模型名称为：_____
+
+---
+
+# 三、模块二：SFT（Supervised Fine-Tuning，监督微调）
+
+> 让基础 LLM 适配推荐场景，学习用户行为序列的生成规律。
+
+## 3.1 输入数据格式（最高重要性）
+
+### 数据构成
+
+```
+instruction（任务指令）+ prompt（用户历史 SID）+ golden_tokens（目标 SID）
+```
+
+其中：
+- **instruction**：包含固定的"任务总说明" + 随机的 task Instruction
+- **prompt**：`{history["input"]}` 是已经编码后的 SID 序列
+- **golden_tokens**：目标商品的三层 SID 的 token 序列
+
+```python
+instruction = f"""Below is an instruction that describes a task, paired with an input that provides further context. Write a response that appropriately completes the request. 
+
+### Instruction:
+{self.instructs[random.randint(0, len(self.instructs)-1)]}
+
+"""
+
+prompt = f"""### User Input: 
+{history["input"]}
+
+### Response:
+"""
+
+# 最终输入 tokens
+tokens = tokenizer.encode(instruction, bos=True, eos=False) + \
+         tokenizer.encode(prompt, bos=False, eos=False) + \
+         tokenizer.encode(target, bos=False, eos=True)
+```
+
+### instruction 和 prompt 分别 tokenize 的原因
+
+1. `bos`/`eos` 标记不同：instruction 需要 `bos=True`，prompt 不需要
+2. 后续处理需要知道 instruction 的长度（`input_prompt_len`）
+3. 代码结构清晰，instruction 和 prompt 是不同的语义组件
+
+### SFT 本质：next-token prediction
+
+- 模型基于用户历史交互物品的 SID 序列（按时间顺序），预测下一个商品的 SID
+- 输入格式：`<bos> sid1 sid2 sid3 ... <eos>`
+- **监督信号** = Cross-Entropy Loss（交叉熵损失）
+
+## 3.2 标签（Labels）与损失计算（最高重要性）
+
+### 标签构造
+
+```python
+tokens = [instruction_tokens] + [prompt_tokens] + [golden_tokens]
+              ↓                       ↓                  ↓
+labels = [-100, -100, ...] + [-100, -100, ...] + [golden_tokens]
+              ↓                       ↓                  ↓
+        instruction部分            prompt部分         target部分
+           (不计算损失)            (不计算损失)      (计算损失)
+```
+
+- `-100` 是 PyTorch `CrossEntropyLoss` 的 `ignore_index` 默认值
+- **"Golden"** 在机器学习中表示"标准答案"或"真实标签"（ground truth）
+
+### Logits 与 Labels 的 Shift 对齐
+
+```python
+完整输入序列:     [t0, t1, t2, t3, t4, t5]
+                                 ├────┴─ target_item
+模型输出的logits: [L0, L1, L2, L3, L4, L5]
+                              ├───┴─ pred_target_item's logits
+
+Shift操作（关键对齐）：
+  Logits用: [L0, L1, L2, L3, L4]  (丢弃最后一个)
+  Labels用: [-100, -100, -100, t4, t5]  (丢弃第一个)
+```
+
+### EOS（End of Sequence）标记
+
+- 在生成 `golden_token` 时使用 `tokenizer.encode(target, bos=False, eos=True)` 自动添加 EOS
+- 本项目 EOS 只是普通的结束标记，参与 next-token prediction 的 loss 计算
+- Qwen 的 `eos_token_id` 通常是 151643
+- **SFT 阶段并不确保生成有效 SID**，约束解码和有效 SID 的保障在 RL 和推理阶段实现
+
+## 3.3 混合数据集策略（中重要性）
+
+SFT 使用多任务联合训练，通过 `ConcatDataset` 合并三个数据集：
+
+| Dataset | Input | Output | 用途 |
+|---------|-------|--------|------|
+| **SidSFTDataset** | 用户依次交互了 history_item_sid，请预测下一个可能的 item | item_sid | 核心序列推荐 |
+| **SidItemFeatDataset** | SID→title / title→SID | title / item_sid | SID 语义映射 |
+| **FusionSeqRecDataset** | 用户历史 SID 序列，请预测下一个 item 的 title | title | 序列 + 语义融合 |
+
+**为什么要用混合数据集：**
+> 此阶段与一组语言对齐目标共同训练，这些目标在**自然语言和 SID 空间之间进行映射**，使推荐系统能够继承嵌入 LLM 中的世界知识，同时将这些知识扎根于离散的项目代码中。
+
+**验证集只用 SidSFTDataset**：当前项目聚焦于观察 SID 生成的指标，可按需更改。
+
+## 3.4 模型选择与优化策略
+
+- **基础模型**：Qwen 系列（0.5B-7B 参数），验证 Scaling Law
+- **优化策略**：
+  - 学习率调度：余弦退火
+  - 梯度累积：解决小批量训练的梯度不稳定问题
+  - 混合精度训练（FP16）
+- **填充策略**：`tokenizer.padding_side = "right"`；若没有专门的 pad_token，用 eos_token 代替
+
+### 微调策略
+
+Freezing LLM parameters, only training new token embeddings：
+1. 先冻结所有参数
+2. 打开 embedding 参数的 `requires_grad`
+3. 通过 `register_hook` 控制哪些 token 的梯度保留
+
+> **【待补充】**
+> `register_hook` 的具体实现代码和梯度屏蔽逻辑未详细展开。
+
+---
+
+# 四、模块三：Recommendation-Oriented RL（面向推荐的强化学习）
+
+> 在 SFT 基础上进一步优化推荐效果，对齐用户真实偏好。
+
+## 4.1 GRPO 算法（最高重要性）
+
+GRPO（Group Relative Policy Optimization）是 MiniOneRec 采用的核心 RL 算法。
+
+### GRPO vs PPO 优势
+
+| 维度 | PPO | GRPO |
+|------|-----|------|
+| 价值函数 | 需要独立的 V 值估计 | 无需价值函数，使用组内标准差归一化 |
+| 优势计算 | 使用 critic 网络估计 | 组内归一化奖励计算相对优势 |
+| 训练稳定性 | 受 critic 质量影响 | 更稳定，组内对比天然去偏 |
+
+### 训练流程
+
+```
+对于每个 Prompt P，生成 G 个补全 [C1, C2, ..., Cg]
+                ↓
+计算每个补全的奖励 R = [r1, r2, ..., rg]
+                ↓
+组内标准化计算优势（核心！）：
+  mean = (r1 + r2 + ... + rg) / g
+  std = sqrt(((r1-mean)² + ... + (rg-mean)²) / g)
+  advantage_i = (ri - mean) / (std + ε)
+                ↓
+使用优势计算策略梯度，更新策略模型
+  policy_loss = exp(log_prob - log_prob.detach) * advantage
+  kl_loss = KL(policy || reference)  # 防止策略变化太大
+  total_loss = policy_loss + beta * kl_loss
+                ↓
+optimizer.step()
+```
+
+### SFT vs RL 的差异
+
+| 维度 | SFT | GRPO |
+|------|-----|------|
+| 训练数据 | prompt + completion 配对 | 只需要 prompt，completion 自行采样 |
+| 目标函数 | 最小化负对数似然（匹配数据分布） | 最大化期望奖励 |
+| ground truth 用途 | 直接作为 label 计算交叉熵 | 用于设计奖励函数 |
+| 生成方式 | teacher forcing | 自由采样 + 约束解码 |
+
+## 4.2 奖励函数设计
+
+### 奖励类型
+
+```python
+if reward_type == "rule":
+    reward_fun = rule_reward           # 简单的命中/未命中（0/1）
+elif reward_type == "ranking":
+    reward_fun = [rule_reward, ndcg_rule_reward]  # 命中奖励 + NDCG风格奖励
+elif reward_type == "ranking_only":
+    reward_fun = ndcg_rule_reward      # 仅NDCG风格奖励
+elif reward_type == "semantic":
+    reward_fun = semantic_reward       # Item embedding余弦相似度
+elif reward_type == "sasrec":
+    reward_fun = cf_reward             # SASRec协同过滤模型打分
+```
+
+- **rule_reward**：命中目标 = 1，否则 = 0，与 Hit Rate（HR@1）等价
+- **ndcg_rule_reward**：NDCG 风格排名奖励，按位置加权
+- **semantic_reward**：Item embedding 余弦相似度
+- **cf_reward**：SASRec 协同过滤模型打分
+- 支持**多奖励函数加权融合**
+
+### 默认奖励策略
+
+默认使用 `reward_type == "rule"`，即简单的 0/1 命中奖励。
+
+> **【待补充 · 源文档未完全解答】**
+> 文档提及 "rank reward，对生成商品的顺序做一个奖励：在 roll out 时推出来的多个选项，基于正确选项的位置计算一个奖励"，但 rank reward 的具体计算公式未明确（仅用 `(?)` 标注）。
+
+## 4.3 约束解码（最高重要性）
+
+### ConstrainedLogitsProcessor
+
+确保生成的 SID token 序列**合法**——即形式上符合 SID 格式且有真实的商品对应。
+
+### 工作流程
+
+```
+输入：scores (num_beams, vocab_size)
+    ↓
+1. 对 scores 做 log_softmax
+2. 初始化 mask = torch.full_like(scores, -inf)
+3. 对每个 beam，查询 hash_dict 获取合法 token 列表
+4. 将合法 token 位置的 mask 设为 0
+5. scores = scores + mask
+6. 对结果做 softmax 得到概率分数
+```
+
+```python
+def __call__(self, input_ids, scores):
+    scores = torch.nn.functional.log_softmax(scores, dim=-1)
+    mask = torch.full_like(scores, float('-inf'))
+    
+    for batch_id, beam_sent in enumerate(input_ids.view(-1, self._num_beams, input_ids.shape[-1])):
+        for beam_id, sent in enumerate(beam_sent):
+            hash_key = sent[-self.count:]
+            allowed_tokens = self._prefix_allowed_tokens_fn(batch_id, hash_key.tolist())
+            mask[batch_id * self._num_beams + beam_id, allowed_tokens] = 0
+    
+    self.count += 1
+    scores = scores + mask
+    return scores
+```
+
+### hash_dict 前缀表
+
+**构建过程：**
+
+```python
+hash_dict = dict()
+for index, ID in enumerate(prefixID):       # 遍历所有经过 tokenize 的 SID 样本
+    ID.append(tokenizer.eos_token_id)        # 末尾添加 EOS token
+    for i in range(prefix_index, len(ID)):  # 遍历每个 token 位置
+        if i == prefix_index:
+            hash_number = get_hash(ID[:i])   # "### Response:\n" 作为初始前缀
+        else:
+            hash_number = get_hash(ID[prefix_index:i])  # 已生成的 token 序列作为前缀
+        if hash_number not in hash_dict:
+            hash_dict[hash_number] = set()
+        hash_dict[hash_number].add(ID[i])    # 记录允许的下一个 token
+```
+
+**查询过程：**
+
+```python
+def prefix_allowed_tokens_fn_semantic(batch_id, input_ids):
+    hash_number = get_hash(input_ids)
+    if hash_number in hash_dict:
+        return hash_dict[hash_number]
+    return []
+```
+
+**key_size 组成：**
+- key = `"### Response"` → 合法的 `<a_{}>`
+- key = 合法的 `<a_{}>` → 合法的 `<b_{}>`
+- key = 合法的 `<b_{}>` → 合法的 `<c_{}>`
+- 因此 hash_dict **每天都需要更新**（当商品库变化时）
+
+### 为什么 hash_dict 只在 evaluate.py 中使用，SFT 训练不用？
+
+> **【待补充 · 源文档未解答】**
+> 源文档提出了此问题但未给出明确回答。推测原因：SFT 阶段使用 teacher forcing（label 已知），不需要约束解码；且 SFT 的目标是学习分布而非确保输出有效。
+
+## 4.4 Beam Search（高重要性）
+
+### beam search 束搜索采样算法
+
+推理采样过程中总是保留当前 top-n 个概率最大的结果。
+
+- 每生成一个 token，将该 token 的概率加到已有 token 序列的总概率上
+- 保留总概率从高到低依次排序的 top-n 个回答
+- **num_beams 和 GRPO 的 num_generation 是对齐的**
+- 给 rank_reward 一个基础条件，同时在 beam search 过程中也可以一定程度上减少非法 SID 的出现
+
+### 生成配置
+
+```python
+self.generation_config = GenerationConfig(
+    do_sample=True,   # 使用随机采样而非贪心
+    temperature=1.0,
+)
+```
+
+### do_sample=True 的原因
+
+- **do_sample=False**（纯贪婪 Beam Search）：每个 beam 选概率最高的 token，易收敛到相同路径，多样性降低
+- **do_sample=True**：每个 beam 根据概率分布采样，保持多样性，适合 GRPO 的组内对比学习
+
+### Beam Search 约束解码完整流程
+
+```
+Step 0: 初始输入 prompt = [bos, sid1, sid2, ...]
+Step 1: model(prompt) → 所有 beam 共享 logits → 约束解码 → 选第一个 token "<"
+Step 2: model([prompt, <]) → 4 个 beam 各自 logits → 约束解码 → 选第二个 token (a_X)
+Step 3: ... 继续直到所有 beam 生成 EOS
+```
+
+> **【待补充 · 源文档未解答】**
+> - Beam Search 的 beam_size 具体是多少？
+> - model.generate() 返回扁平格式后如何重组为 prompt-beam 结构？
+> - 文档提到 "mean pooling" 用于何处？
+
+## 4.5 RL 数据集 【中重要性】
+
+RL 阶段需要比 SFT 更灵活的数据集设计：
+
+### RL 数据集列表
+
+| Dataset | 说明 |
+|---------|------|
+| **SidDataset** | 基础 SID 序列数据集 |
+| **RLTitle2SidDataset** | Title → SID 映射任务 |
+| **RLSeqTitle2SidDataset** | Title 历史序列 → SID 预测 |
+
+### RL 数据集特点
+
+- **Prompt 格式简化**：移除 Instruction，更灵活地适配 RL 阶段的动态 Prompt 策略
+- **新增 Description → SID 任务**：增强模型从自然语言描述到 SID 的映射能力
+- **辅助映射字典**：`prompt2history` / `history2target` 用于奖励计算时的回溯和评估
+- **文本输入而非 Token 输入**：便于 RL 阶段对不同采样策略的灵活处理
+- **混合历史表示**：既有 SID 历史，也有 Title 历史，提升模型鲁棒性
+
+## 4.6 损失函数变体与特色技术
+
+### 损失函数可配置
+
+支持三种变体：
+- **GRPO**（默认）：标准 GRPO 损失
+- **DAPO**：基于 GRPO 的变体
+- **GSPO**：基于 GRPO 的变体
+
+### 技术亮点
+
+| 亮点 | 说明 |
+|------|------|
+| 推荐专属 GRPO | 针对推荐任务调整，包含 NDCG/HR 等推荐指标监控 |
+| 训练时约束解码 | 与推理时保持一致，训练时就不产生无效 SID |
+| 损失函数可配置 | 支持 GRPO/DAPO/GSPO 三种变体 |
+| 多样性促进 | `token_diversity` 和 `categorical_diversity` 指标 |
+| Beam 搜索集成 | 可选 beam_search 模式进行 RL 训练 |
+| 动态采样 | `dynamic_sampling` 灵活的生成策略 |
+
+---
+
+# 五、SFT → RL 的过渡与 U 型曲线
+
+## 5.1 RL 过程中模型为什么先变差再变好？【高重要性】
+
+### 现象
+
+RL 训练初期性能下降（指标先变差），经过一定步数后性能回升并超越 SFT。
+
+### 原因分析
+
+**为什么 RL 前期性能会下降？**
+
+数学上，SFT 和 RL 的目标函数**完全不一致**：
+- **SFT**：最小化负对数似然（NLL），让模型匹配**训练数据分布**（记忆模式）
+- **RL**：最大化期望**奖励**，只在乎是否能获得高分（推理/探索模式）
+
+这两个目标存在**根本性冲突**。第二阶段 RL 必定会破坏第一阶段 SFT 学习的内容——**灾难性遗忘**。模型从"背答案"切换到"自由探索"。
+
+**为什么性能又回升了？**
+
+模型权重矩阵的**奇异值分解（SVD）** 分析表明：RL 训练促使模型从"记忆训练数据分布"转向"学习以奖励为主导的泛化能力"。U 型指标曲线本质上是**模型从记忆模式向推理模式的转变过程**。
+
+### 关键结论
+
+- **RFT（Rejection Fine-Tuning）比 SFT 更不容易遗忘**
+- RL 要求数据具备**可验证性**（规则奖励函数），数据的难度分布对 GRPO 来说应该是**中等难度**效果最好
+- OOD（分布外泛化）能力在 RL 阶段得到增强
+
+---
+
+# 六、推理与评估
+
+## 6.1 评估指标体系
+
+### 推荐核心指标
+
+- **GAUC**：按用户分组计算的 AUC，衡量排序质量（1 用户 = 1 组）
+- **Precision@K**：前 K 个推荐的准确率
+- **Recall@K**：前 K 个推荐的召回率
+- **NDCG@K**：归一化折损累积增益，综合考虑相关性与位置
+
+### 生成质量指标
+
+- **PPL（困惑度）**：衡量生成序列的流畅性
+- **多样性指标**：如覆盖率、熵值
+
+## 6.2 推理优化策略
+
+- **SID 缓存**：预计算所有物品的 SID，避免推理时重复计算
+- **束搜索优化**：调整 beam size 平衡生成质量与推理速度
+- **量化推理**：对模型参数进行 INT8 量化，提升推理速度
+
+## 6.3 训练流程与资源
+
+- **完整流程**：数据预处理 → SID 构建（RQ-VAE 训练）→ SFT 训练 → RL 训练 → 模型部署
+- **硬件需求**：4-8 卡 A100（40GB），支持 0.5B-7B 参数
+- **训练时间**：SID 构建约 1-2 天，SFT 约 3-5 天，RL 约 2-3 天
+
+---
+
+# 七、扩展话题
+
+## 7.1 商品冷启动【中重要性】
+
+**问题**：有一个全新的商品 C，模型此前没有见过 C，如何推荐？
+
+**解决方案**：
+1. **SID 映射**：新商品通过 RQ-VAE 编码器得到 SID，量化模型会保证相似商品的 SID 相近
+2. **SID 语义泛化**：新商品的 SID 落在已学的语义空间内
+3. **hash_dict 更新**：新 SID 加入 hash_dict，更新约束 decoder，保证生成的 SID 合法（即存在真实的商品映射）
+4. **预训练模型知识泛化**：利用 LLM 本身的世界知识进行推理
+
+## 7.2 Scaling Law 验证
+
+MiniOneRec 在 0.5B-7B 参数范围内，训练损失与评估损失随模型参数增加**持续下降**，未出现性能饱和现象。证明生成式推荐具备与 LLM 类似的扩展潜力。
+
+## 7.3 码本 embedding 与 token embedding 的关系
+
+**问**：量化时的码本空间是 embedding 向量，add_token 的初始化 embedding 也是，为什么不能直接用码本 embedding 做初始化？
+
+**答**：
+1. 二者的**特征空间并不一致**
+2. 训练完成的码本 embedding 已经可以表示商品的语义，如果用码本 embedding 做初始化，微调阶段这种学习到的语义表示就被破坏掉了，并不能起到提升作用
+
+---
+
+# 附录：被删除的内容及原因
+
+以下内容来自源文档，因与 MiniOneRec 项目架构无直接关联而被删除：
+
+1. **03 文档 #1「MHA 深入理解」**（关于 `model.embed_tokens` 查表机制、QKV 矩阵乘法、FFN 残差结构、Encoder/Decoder 架构区别等）
+   - **删除原因**：通用的 Transformer 基础知识，非 MiniOneRec 项目特有内容。
+
+2. **03 文档 #5「EOS 的语义总结作用」**（关于 Qwen3-embedding 中 EOS token 作为句子语义表示的用法）
+   - **删除原因**：其他模型的用法。本项目 EOS 仅作为序列结束标记使用。
+
+3. **03 文档 #6「SFT 采用右填充」后半段**（关于 Flash Attention 的提问与 padding 策略的变化）
+   - **删除原因**：该部分仅提出问题但未得到解答，且 Flash Attention 不属于 MiniOneRec 核心架构内容。保留的"右填充策略"部分已归入 SFT 章节。
+
+4. **03 文档 #12「缓存命中」**
+   - **删除原因**：仅有一个标题，上下文不完整，无实质内容。
+
+5. **00 文档中 Beam Search 第 7-10 节的逐步数值示例**（包含具体 token id 如 91、92、93 的详细逐步展开）
+   - **删除原因**：过于细节的数值示例，核心逻辑已保留在第四章约束解码和 Beam Search 部分。保留整体流程和核心原理，删除具体的假设性数字推演。
+
+6. **00 文档中「面试必备」速记清单**
+   - **删除原因**：属于总结性速记，内容已分散融入各章节。
