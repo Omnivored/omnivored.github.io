@@ -1,0 +1,134 @@
+- name: "MiniOne Racing"
+  tags: ["竞速", "漂移", "BOSS", "探索"]
+  status: "Playing"
+  progress: 92
+  collectibles:
+    - name: "赛车道具"
+      found: 45
+      total: 48
+    - name: "隐藏皮肤"
+      found: 6
+      total: 10
+    - name: "成就奖杯"
+      found: 18
+      total: 20
+  guide: |
+    游戏核心技巧：
+
+    1. 开局加速：按油门键的同时按住方向键，可以触发弹射起步。
+
+    2. 漂移过弯：入弯前松油门，按漂移键+方向，出弯时反打方向可以获得加速。
+
+    3. 捷径路线：第3个赛道的右侧树林中有隐藏捷径，可节省约3秒。
+
+    4. 道具使用：龟壳道具建议在直线赛道使用，香蕉皮放在弯道入口处效果最佳。
+
+    5. BOSS战：最终BOSS弱点是正面撞击3次后它会眩晕，此时绕后攻击。
+  screenshots:
+    - src: "img/games/minione/race_start.jpg"
+      tags: ["赛道", "竞速"]
+      description: "开局弹射起步瞬间，速度达到最大"
+    - src: "img/games/minione/drift_turn.jpg"
+      tags: ["技巧", "漂移"]
+      description: "完美漂移过弯，积攒加速能量"
+    - src: "img/games/minione/shortcut.jpg"
+      tags: ["探索", "捷径"]
+      description: "发现的隐藏捷径入口，可以大幅缩短时间"
+    - src: "img/games/minione/boss_fight.jpg"
+      tags: ["BOSS", "战斗"]
+      description: "最终BOSS战，抓住眩晕时机输出"
+    - src: "img/games/minione/victory.jpg"
+      tags: ["成就", "剧情"]
+      description: "通关后的庆祝画面，全成就达成"
+
+- name: "星之卡比 探索发现"
+  tags: ["收集", "探索", "BOSS", "隐藏"]
+  status: "Completed"
+  progress: 100
+  collectibles:
+    - name: "瓦豆鲁迪"
+      found: 300
+      total: 300
+    - name: "设计图"
+      found: 25
+      total: 25
+    - name: "隐藏关卡"
+      found: 10
+      total: 10
+  guide: |
+    全收集攻略要点：
+
+    1. 每个关卡有3个隐藏瓦豆鲁迪，需要仔细探索每个角落。
+
+    2. 第二世界有隐藏通道，需要利用卡比的变形能力通过。
+
+    3. 最终BOSS二阶段需要完美闪避3次连击后才能有效输出。
+
+    4. 收集全部设计图后可以解锁隐藏武器「星辰之剑」。
+  screenshots:
+    - src: "img/games/kirby/world1.jpg"
+      tags: ["探索", "收集"]
+      description: "第一世界全收集完成，所有瓦豆鲁迪找到"
+    - src: "img/games/kirby/boss1.jpg"
+      tags: ["BOSS", "战斗"]
+      description: "第一世界BOSS战，使用冰冻能力克制"
+    - src: "img/games/kirby/secret.jpg"
+      tags: ["探索", "隐藏"]
+      description: "发现的隐藏通道，通往秘密房间"
+    - src: "img/games/kirby/final_boss.jpg"
+      tags: ["BOSS", "剧情"]
+      description: "最终BOSS战，完美闪避后反击"
+    - src: "img/games/kirby/ending.jpg"
+      tags: ["成就", "剧情"]
+      description: "游戏通关画面，100%完成度"
+
+- name: "塞尔达传说 旷野之息"
+  tags: ["探索", "解谜", "战斗", "收集", "BOSS"]
+  status: "Playing"
+  progress: 45
+  collectibles:
+    - name: "神庙挑战"
+      found: 55
+      total: 120
+    - name: "呀哈哈"
+      found: 89
+      total: 900
+    - name: "回忆地点"
+      found: 8
+      total: 12
+    - name: "英杰技能"
+      found: 3
+      total: 4
+  guide: |
+    新手进阶指南：
+
+    1. 初期优先提升耐力，可以到达更多区域。
+
+    2. 新手村出来后直奔「双子山」塔，解锁地图中部区域。
+
+    3. 获得滑翔伞后优先去「海布拉山」获取防寒服。
+
+    4. 四英杰任务的推荐顺序：风→水→火→雷。
+
+    5. 呀哈哈种子的标记方法：发现但无法获取的用地图标记，后期再来。
+
+    6. 大师剑获取需要13颗心，建议优先提升心心上限。
+  screenshots:
+    - src: "img/games/botw/plateau.jpg"
+      tags: ["探索", "初始"]
+      description: "从初始台地眺望整个海拉尔大陆"
+    - src: "img/games/botw/tower.jpg"
+      tags: ["探索", "技巧"]
+      description: "攀爬到双子山塔顶，解锁地图区域"
+    - src: "img/games/botw/shrine.jpg"
+      tags: ["解谜", "神庙"]
+      description: "完成一个力之试炼神庙，获得试炼通过证"
+    - src: "img/games/botw/guardian.jpg"
+      tags: ["战斗", "探索"]
+      description: "野外遭遇守护者，使用盾反技巧击败"
+    - src: "img/games/botw/divine_beast.jpg"
+      tags: ["BOSS", "剧情"]
+      description: "进入风之神兽内部，解谜准备BOSS战"
+    - src: "img/games/botw/memory.jpg"
+      tags: ["剧情", "收集"]
+      description: "找到一段遗失的记忆，了解百年前的故事"
