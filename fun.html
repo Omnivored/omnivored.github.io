@@ -391,12 +391,12 @@ var SCREENSHOT_DATA = {};
 // ================================================================
 {% for file in site.static_files %}
   {% assign ext = file.extname | downcase %}
-  {% if file.path contains '/img/games/' and ext != '.webp' and ext != '.jpg' and ext != '.jpeg' and ext != '.png' and ext != '.gif' %}
+  {% if file.path contains 'img/games/' and ext != '.webp' and ext != '.jpg' and ext != '.jpeg' and ext != '.png' and ext != '.gif' %}
     {% continue %}
   {% endif %}
-  {% if file.path contains '/img/games/' %}
+  {% if file.path contains 'img/games/' %}
     {% assign parts = file.path | split: '/' %}
-    {% assign game_id = parts[2] %}
+    {% assign game_id = parts[parts.size | minus: 2] %}
     {% assign filename = file.name %}
     {% assign local_path = site.baseurl %}{{ file.path }}
     // 如果该图片未被 notes.yml 注册，则用本地路径
