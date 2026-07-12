@@ -391,10 +391,11 @@ var SCREENSHOT_DATA = {};
 // ================================================================
 {% for file in site.static_files %}
   {% assign ext = file.extname | downcase %}
-  {% if file.path contains 'img/games/' and ext != '.webp' and ext != '.jpg' and ext != '.jpeg' and ext != '.png' and ext != '.gif' %}
-    {% continue %}
+  {% assign is_img = false %}
+  {% if ext == '.jpg' or ext == '.jpeg' or ext == '.png' or ext == '.gif' or ext == '.webp' %}
+    {% assign is_img = true %}
   {% endif %}
-  {% if file.path contains 'img/games/' %}
+  {% if file.path contains 'img/games/' and is_img %}
     {% assign parts = file.path | split: '/' %}
     {% assign game_id = parts[parts.size | minus: 2] %}
     {% assign filename = file.name %}
