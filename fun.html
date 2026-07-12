@@ -17,9 +17,26 @@ header-img: "img/tag-bg.jpg"
   --text-light: #888;
   --shadow: 0 2px 12px rgba(0,0,0,0.08);
   --radius: 10px;
+  --blur-amount: 20px;
 }
 * { box-sizing: border-box; }
 body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+
+/* ===== 隐藏侧边栏，全宽布局 ===== */
+.sidebar-container {
+  display: none !important;
+}
+.post-container {
+  width: 100% !important;
+  max-width: 1200px !important;
+  margin: 0 auto !important;
+  float: none !important;
+  padding-left: 20px !important;
+  padding-right: 20px !important;
+}
+@media (min-width: 1200px) {
+  .post-container { padding-left: 20px !important; padding-right: 20px !important; }
+}
 
 /* ===== 游戏标签栏 ===== */
 .game-tabs {
@@ -196,9 +213,16 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 /* 图片网格 */
 .gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  grid-template-columns: repeat(3, 1fr);
   gap: 20px;
 }
+@media (max-width: 900px) {
+  .gallery-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 600px) {
+  .gallery-grid { grid-template-columns: 1fr; }
+}
+
 .gallery-card {
   background: var(--bg-card);
   border-radius: var(--radius);
@@ -212,7 +236,7 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 
 .gallery-card .img-wrap {
   width: 100%;
-  height: 200px;
+  height: 220px;
   background: #f0f0f0;
   display: flex;
   align-items: center;
@@ -222,17 +246,26 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
   position: relative;
 }
 .gallery-card .img-wrap img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
   transition: transform 0.3s;
+  position: relative;
+  z-index: 2;
 }
-.gallery-card .img-wrap:hover img { transform: scale(1.05); }
-.gallery-card .img-wrap .placeholder {
-  color: #aaa;
-  font-size: 13px;
-  text-align: center;
-  padding: 20px;
+.gallery-card .img-wrap:hover img { transform: scale(1.03); }
+.gallery-card .img-wrap .img-bg {
+  position: absolute;
+  inset: -10px;
+  z-index: 1;
+  background-size: cover;
+  background-position: center;
+  filter: blur(var(--blur-amount));
+  opacity: 0.5;
+}
+.gallery-card .img-wrap .img-bg.portrait {
+  background-position: center top 10%;
+  background-size: 120% auto;
 }
 
 /* 备注区域 */
@@ -434,6 +467,12 @@ var GAME_META = {};
       <span class="stat-info" id="statInfo">共 0 张</span>
     </div>
   </div>
+  <!-- 模糊度调节 -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;font-size:13px;color:#888;">
+    <span>🌫️ 模糊度</span>
+    <input type="range" id="blurSlider" min="0" max="50" value="20" style="width:120px;cursor:pointer;" />
+    <span id="blurValue">20px</span>
+  </div>
 
   <div class="gallery-grid" id="galleryGrid"></div>
 </section>
@@ -608,6 +647,7 @@ var GAME_META = {};
 
       html += '<div class="gallery-card" data-game="' + img.gameId + '" data-filename="' + img.filename + '">';
       html += '  <div class="img-wrap" data-src="' + img.src + '">';
+      html += '    <div class="img-bg" style="background-image:url(' + img.src + ');"></div>';
       html += '    <img src="' + img.src + '" alt="' + img.filename + '" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div class=placeholder>📷 ' + img.filename + '</div>\'" />';
       html += '  </div>';
       html += '  <div class="notes-area">';
@@ -635,6 +675,22 @@ var GAME_META = {};
 
     // 绑定大图预览
     $grid.querySelectorAll('.img-wrap').forEach(function(wrap) {
+      // 检测图片方向，添加对应 class
+      var img = wrap.querySelector('img');
+      if (img && img.complete && img.naturalWidth > 0) {
+        var bg = wrap.querySelector('.img-bg');
+        if (bg && img.naturalHeight > img.naturalWidth) {
+          bg.classList.add('portrait');
+        }
+      } else if (img) {
+        img.addEventListener('load', function() {
+          var bg = wrap.querySelector('.img-bg');
+          if (bg && this.naturalHeight > this.naturalWidth) {
+            bg.classList.add('portrait');
+          }
+        });
+      }
+      // 大图预览
       wrap.addEventListener('click', function() {
         var src = this.getAttribute('data-src');
         if (src) {
@@ -729,6 +785,15 @@ var GAME_META = {};
       // 搜索模式显示搜索框
       document.getElementById('searchMode').style.display = mode === 'search' ? 'block' : 'none';
       renderGallery();
+    });
+
+    // 模糊度调节
+    var blurSlider = document.getElementById('blurSlider');
+    var blurValue = document.getElementById('blurValue');
+    blurSlider.addEventListener('input', function() {
+      var val = this.value;
+      blurValue.textContent = val + 'px';
+      document.documentElement.style.setProperty('--blur-amount', val + 'px');
     });
 
     // 导航按钮
