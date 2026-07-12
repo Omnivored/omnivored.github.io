@@ -343,41 +343,45 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 
 <!-- ============================================================ -->
 <!-- 数据层：由 Liquid 在构建时渲染为 JavaScript                    -->
-<!-- 数据来源：                                                   -->
-<!--   1. _data/notes.yml 中的图片和备注（src 可选，不填则本地）   -->
-<!--   2. site.static_files 自动发现 → 本地 img/games/ 目录       -->
-<!-- 备注始终从 _data/notes.yml 读取                              -->
+<!-- 图片来源：site.static_files 自动发现 img/games/ 目录下的图片   -->
+<!-- 备注来源：_data/notes.yml                                    -->
 <!-- ============================================================ -->
 <script>
 // ================================================================
-// 第一部分：从 _data/notes.yml 读取图片 + 备注
-// 图片直接放入 img/games/{游戏名}/ 目录即可自动发现
+// 第一部分：从 site.static_files 自动发现所有图片
+// 图片放入 img/games/{游戏名}/ 目录即可自动出现
 // ================================================================
-var NOTES_DATA = {};
 var SCREENSHOT_DATA = {};
+var NOTES_DATA = {};
 
+{% for file in site.static_files %}
+  {% assign ext = file.extname | downcase %}
+  {% if ext == '.jpg' or ext == '.jpeg' or ext == '.png' or ext == '.gif' or ext == '.webp' %}
+    {% if file.path contains 'img/games/' %}
+      {% assign parts = file.path | split: '/' %}
+      {% assign game_id = parts[parts.size | minus: 2] %}
+      {% assign filename = file.name %}
+      {% assign src = site.baseurl | append: '/' | append: file.path | replace: '//', '/' %}
+      // {{ game_id }}/{{ filename }}
+      SCREENSHOT_DATA['{{ game_id }}'] = SCREENSHOT_DATA['{{ game_id }}'] || [];
+      SCREENSHOT_DATA['{{ game_id }}'].push({ "src": "{{ src }}", "filename": "{{ filename }}" });
+    {% endif %}
+  {% endif %}
+{% endfor %}
+
+// ================================================================
+// 第二部分：从 _data/notes.yml 读取备注
+// 编辑 _data/notes.yml 文件，上传后网站自动读取
+// ================================================================
 {% for game_entry in site.data.notes %}
   {% assign game_id = game_entry[0] %}
   {% assign notes_for_game = game_entry[1] %}
   NOTES_DATA['{{ game_id }}'] = {};
-  if (!SCREENSHOT_DATA['{{ game_id }}']) SCREENSHOT_DATA['{{ game_id }}'] = [];
 
   {% for note_entry in notes_for_game %}
     {% assign filename = note_entry[0] %}
     {% assign note = note_entry[1] %}
-    // 图片数据
-    {% if note.src %}
-      // 有远程地址
-      var imgSrc = {{ note.src | jsonify }};
-    {% else %}
-      // 无远程地址，使用本地路径（将图片放入 img/games/）
-      var imgSrc = {{ site.baseurl | append: '/' | append: 'img/games/' | append: game_id | append: '/' | append: filename | replace: '//', '/' | jsonify }};
-    {% endif %}
-    SCREENSHOT_DATA[{{ game_id | jsonify }}].push({ "src": imgSrc, "filename": {{ filename | jsonify }} });
-
-    // 备注数据
-    if (!NOTES_DATA[{{ game_id | jsonify }}]) NOTES_DATA[{{ game_id | jsonify }}] = {};
-    NOTES_DATA[{{ game_id | jsonify }}][{{ filename | jsonify }}] = {
+    NOTES_DATA['{{ game_id }}']['{{ filename }}'] = {
       outfitCode: {{ note.outfitCode | default: null | jsonify }},
       cameraParams: {{ note.cameraParams | default: null | jsonify }},
       themeWords: {{ note.themeWords | default: null | jsonify }},
@@ -387,38 +391,7 @@ var SCREENSHOT_DATA = {};
 {% endfor %}
 
 // ================================================================
-// 第二部分：补充未在 notes.yml 中注册的本地图片
-// 从 site.static_files 自动发现 img/games/ 下的未被注册的图片
-// ================================================================
-{% for file in site.static_files %}
-  {% assign ext = file.extname | downcase %}
-  {% assign is_img = false %}
-  {% if ext == '.jpg' or ext == '.jpeg' or ext == '.png' or ext == '.gif' or ext == '.webp' %}
-    {% assign is_img = true %}
-  {% endif %}
-  {% if file.path contains 'img/games/' and is_img %}
-    {% assign parts = file.path | split: '/' %}
-    {% assign game_id = parts[parts.size | minus: 2] %}
-    {% assign filename = file.name %}
-    {% assign local_path = site.baseurl | append: '/' | append: file.path | replace: '//', '/' %}
-    // 如果该图片未被 notes.yml 注册，则用本地路径
-    if ({{ game_id | jsonify }} && !SCREENSHOT_DATA[{{ game_id | jsonify }}]) SCREENSHOT_DATA[{{ game_id | jsonify }}] = [];
-    var alreadyRegistered = false;
-    if (SCREENSHOT_DATA[{{ game_id | jsonify }}]) {
-      for (var _i = 0; _i < SCREENSHOT_DATA[{{ game_id | jsonify }}].length; _i++) {
-        if (SCREENSHOT_DATA[{{ game_id | jsonify }}][_i].filename === {{ filename | jsonify }}) {
-          alreadyRegistered = true; break;
-        }
-      }
-    }
-    if (!alreadyRegistered) {
-      SCREENSHOT_DATA[{{ game_id | jsonify }}].push({ "src": {{ local_path | jsonify }}, "filename": {{ filename | jsonify }} });
-    }
-  {% endif %}
-{% endfor %}
-
-// ================================================================
-// 游戏元信息 — 从所有图片数据中提取游戏列表
+// 游戏元信息 — 从自动发现的图片中提取游戏列表
 // ================================================================
 var GAME_META = {};
 (function() {
