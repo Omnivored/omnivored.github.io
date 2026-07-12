@@ -1,0 +1,6 @@
+{
+  "rcloneRemote": "r2",
+  "rcloneBucket": "game-screenshots",
+  "publicUrlPrefix": "https://pub-xxxxx.r2.dev",
+  "games": ["nikki", "ff14"]
+}

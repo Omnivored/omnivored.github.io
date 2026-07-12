@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>游戏截图备注编辑器</title>
+<style>
+:root {
+  --primary: #2c3e50;
+  --accent: #e74c3c;
+  --bg: #f5f5f5;
+  --card: #fff;
+  --border: #e0e0e0;
+  --text: #333;
+  --text-light: #888;
+  --radius: 10px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  padding: 0;
+}
+header {
+  background: var(--primary);
+  color: #fff;
+  padding: 16px 24px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+}
+header h1 { font-size: 18px; font-weight: 600; }
+header .actions { display: flex; gap: 10px; align-items: center; }
+header .actions .hint { font-size: 12px; opacity: 0.8; }
+.btn {
+  padding: 8px 20px;
+  border: none;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-primary { background: #e74c3c; color: #fff; }
+.btn-primary:hover { background: #c0392b; }
+.btn-secondary { background: rgba(255,255,255,0.15); color: #fff; }
+.btn-secondary:hover { background: rgba(255,255,255,0.25); }
+.btn-success {
+  background: #27ae60;
+  color: #fff;
+  padding: 10px 28px;
+  font-size: 15px;
+}
+.btn-success:hover { background: #219a52; }
+.btn-success:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* 游戏标签 */
+.game-tabs {
+  display: flex;
+  gap: 6px;
+  padding: 16px 24px 0;
+  flex-wrap: wrap;
+}
+.game-tab {
+  padding: 8px 20px;
+  border-radius: 8px 8px 0 0;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  background: #eee;
+  color: var(--text-light);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+.game-tab.active { background: var(--card); color: var(--text); font-weight: 600; }
+.game-tab:hover:not(.active) { background: #e0e0e0; }
+.game-tab .badge {
+  display: inline-block;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  padding: 1px 7px;
+  border-radius: 10px;
+  margin-left: 5px;
+}
+
+/* 图片网格 */
+.game-content {
+  display: none;
+  padding: 20px 24px;
+}
+.game-content.active { display: block; }
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 20px;
+}
+.gallery-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  transition: box-shadow 0.2s;
+}
+.gallery-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.12); }
+.gallery-card .img-wrap {
+  width: 100%;
+  height: 200px;
+  background: #1a1a2e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.gallery-card .img-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.gallery-card .img-wrap .load-error {
+  color: #999;
+  font-size: 13px;
+  text-align: center;
+  padding: 20px;
+}
+.notes-area {
+  padding: 14px 16px 16px;
+}
+.notes-area .filename {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-bottom: 10px;
+  word-break: break-all;
+  font-family: monospace;
+}
+.note-field { margin-bottom: 10px; }
+.note-field:last-child { margin-bottom: 0; }
+.note-field label {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-light);
+  margin-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+.note-field input,
+.note-field textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+  background: #fafafa;
+}
+.note-field input:focus,
+.note-field textarea:focus {
+  border-color: var(--accent);
+  background: #fff;
+}
+.note-field textarea { resize: vertical; min-height: 40px; }
+
+/* 保存提示 */
+.toast {
+  position: fixed;
+  bottom: 30px;
+  left: 50%;
+  transform: translateX(-50%) translateY(100px);
+  background: #27ae60;
+  color: #fff;
+  padding: 12px 28px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  opacity: 0;
+  transition: all 0.4s;
+  z-index: 999;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.error { background: #e74c3c; }
+
+/* 空状态 */
+.empty-state {
+  text-align: center;
+  padding: 60px 20px;
+  color: #aaa;
+  font-size: 14px;
+  line-height: 2;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .gallery-grid { grid-template-columns: 1fr; }
+  header h1 { font-size: 15px; }
+  .game-tabs { padding: 12px 12px 0; }
+  .game-content { padding: 12px; }
+}
+
+/* 加载动画 */
+.loading {
+  text-align: center;
+  padding: 60px;
+  color: #aaa;
+}
+.spinner {
+  display: inline-block;
+  width: 32px;
+  height: 32px;
+  border: 3px solid #eee;
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🎮 游戏截图备注编辑器</h1>
+  <div class="actions">
+    <span class="hint">编辑后点击保存 → 自动更新 _data/notes.yml</span>
+    <button class="btn btn-secondary" onclick="saveAll()">💾 保存到 YAML</button>
+  </div>
+</header>
+
+<div class="game-tabs" id="gameTabs"></div>
+
+<div id="gameContents"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ------------------------------------------------------------
+// 数据 — 由后端注入
+// ------------------------------------------------------------
+var GAMES = {
+  "nikki": [
+    {
+      "filename": "007Eih3Qly1h96taojp4vj30qo14zjxt.jpg",
+      "src": "/img/games/nikki/007Eih3Qly1h96taojp4vj30qo14zjxt.jpg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_06_12_22_14_57_3858475.jpeg",
+      "src": "/img/games/nikki/2025_06_12_22_14_57_3858475.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_06_13_19_39_14_3373448.jpeg",
+      "src": "/img/games/nikki/2025_06_13_19_39_14_3373448.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_07_25_22_46_50_7029269.jpeg",
+      "src": "/img/games/nikki/2025_07_25_22_46_50_7029269.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_09_17_16_12_30_3740020.jpeg",
+      "src": "/img/games/nikki/2025_09_17_16_12_30_3740020.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_09_26_13_05_06_1774247.jpeg",
+      "src": "/img/games/nikki/2025_09_26_13_05_06_1774247.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_09_30_18_45_16_518885.jpeg",
+      "src": "/img/games/nikki/2025_09_30_18_45_16_518885.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_10_03_00_15_09_7268794.jpeg",
+      "src": "/img/games/nikki/2025_10_03_00_15_09_7268794.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_10_03_15_31_17_1159238.jpeg",
+      "src": "/img/games/nikki/2025_10_03_15_31_17_1159238.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_10_03_15_34_26_1348287.jpeg",
+      "src": "/img/games/nikki/2025_10_03_15_34_26_1348287.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_11_17_18_49_38_2445954.jpeg",
+      "src": "/img/games/nikki/2025_11_17_18_49_38_2445954.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_11_17_18_52_38_2626102.jpeg",
+      "src": "/img/games/nikki/2025_11_17_18_52_38_2626102.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_12_09_14_51_20_3653224.jpeg",
+      "src": "/img/games/nikki/2025_12_09_14_51_20_3653224.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_12_19_18_03_12_1364661.jpeg",
+      "src": "/img/games/nikki/2025_12_19_18_03_12_1364661.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2025_12_30_14_46_04_6220916.jpeg",
+      "src": "/img/games/nikki/2025_12_30_14_46_04_6220916.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2026_01_19_16_27_27_1566231.jpg",
+      "src": "/img/games/nikki/2026_01_19_16_27_27_1566231.jpg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2026_04_13_18_13_57_3018486.jpeg",
+      "src": "/img/games/nikki/2026_04_13_18_13_57_3018486.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2026_04_20_13_20_14_4318142.jpeg",
+      "src": "/img/games/nikki/2026_04_20_13_20_14_4318142.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2026_05_18_16_28_01_1639365.jpeg",
+      "src": "/img/games/nikki/2026_05_18_16_28_01_1639365.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    },
+    {
+      "filename": "2026_06_13_16_25_02_11132304.jpeg",
+      "src": "/img/games/nikki/2026_06_13_16_25_02_11132304.jpeg",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    }
+  ],
+  "ff14": [
+    {
+      "filename": "ffxiv_20250301_190817_409_副本.png",
+      "src": "/img/games/ff14/ffxiv_20250301_190817_409_副本.png",
+      "outfitCode": "",
+      "cameraParams": "",
+      "themeWords": "",
+      "customNotes": ""
+    }
+  ]
+};
+var GAME_IDS = ["nikki","ff14"];
+
+// ------------------------------------------------------------
+// 渲染
+// ------------------------------------------------------------
+function render() {
+  var tabHtml = '';
+  var contentHtml = '';
+
+  GAME_IDS.forEach(function(id, idx) {
+    var images = GAMES[id] || [];
+    var active = idx === 0 ? ' active' : '';
+
+    tabHtml += '<div class="game-tab' + active + '" data-game="' + id + '" onclick="switchGame('' + id + '')">' + cap(id) + ' <span class="badge">' + images.length + '</span></div>';
+  });
+
+  GAME_IDS.forEach(function(id, idx) {
+    var images = GAMES[id] || [];
+    var active = idx === 0 ? ' active' : '';
+
+    contentHtml += '<div class="game-content' + active + '" id="content-' + id + '">';
+
+    if (images.length === 0) {
+      contentHtml += '<div class="empty-state">📭 暂无截图<br>请先将图片上传到 R2 的 ' + id + '/ 目录</div>';
+    } else {
+      contentHtml += '<div class="gallery-grid">';
+      images.forEach(function(img) {
+        contentHtml += '<div class="gallery-card" data-filename="' + escAttr(img.filename) + '">';
+        contentHtml += '  <div class="img-wrap">';
+        contentHtml += '    <img src="' + escAttr(img.src) + '" alt="' + escAttr(img.filename) + '" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML='<div class=load-error>⚠️ 加载失败: ' + escAttr(img.filename) + '</div>'" />';
+        contentHtml += '  </div>';
+        contentHtml += '  <div class="notes-area">';
+        contentHtml += '    <div class="filename">' + escHtml(img.filename) + '</div>';
+        contentHtml += '    <div class="note-field"><label>🎀 搭配码</label><input type="text" class="note-input" data-field="outfitCode" value="' + escAttr(img.outfitCode) + '" placeholder="输入搭配码" /></div>';
+        contentHtml += '    <div class="note-field"><label>📷 镜头参数</label><input type="text" class="note-input" data-field="cameraParams" value="' + escAttr(img.cameraParams) + '" placeholder="输入镜头参数" /></div>';
+        contentHtml += '    <div class="note-field"><label>🏷️ 主题词</label><input type="text" class="note-input" data-field="themeWords" value="' + escAttr(img.themeWords) + '" placeholder="输入主题词" /></div>';
+        contentHtml += '    <div class="note-field"><label>📝 自定义备注</label><textarea class="note-input" data-field="customNotes" rows="2" placeholder="输入自定义备注">' + escHtml(img.customNotes) + '</textarea></div>';
+        contentHtml += '  </div>';
+        contentHtml += '</div>';
+      });
+      contentHtml += '</div>';
+    }
+    contentHtml += '</div>';
+  });
+
+  document.getElementById('gameTabs').innerHTML = tabHtml;
+  document.getElementById('gameContents').innerHTML = contentHtml;
+}
+
+function switchGame(id) {
+  document.querySelectorAll('.game-tab').forEach(function(t) { t.classList.toggle('active', t.dataset.game === id); });
+  document.querySelectorAll('.game-content').forEach(function(c) { c.classList.toggle('active', c.id === 'content-' + id); });
+}
+
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+function escAttr(s) { return String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+function escHtml(s) { return String(s).replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+// ------------------------------------------------------------
+// 保存
+// ------------------------------------------------------------
+function collectData() {
+  var data = {};
+  GAME_IDS.forEach(function(gameId) {
+    data[gameId] = {};
+    var cards = document.querySelectorAll('#content-' + gameId + ' .gallery-card');
+    cards.forEach(function(card) {
+      var filename = card.dataset.filename;
+      var note = { outfitCode: '', cameraParams: '', themeWords: '', customNotes: '' };
+      card.querySelectorAll('.note-input').forEach(function(el) {
+        note[el.dataset.field] = el.value;
+      });
+      data[gameId][filename] = note;
+    });
+  });
+  return data;
+}
+
+function saveAll() {
+  var btn = document.querySelector('.btn-secondary');
+  btn.disabled = true;
+  btn.textContent = '⏳ 保存中...';
+
+  var data = collectData();
+  var xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/save', true);
+  xhr.setRequestHeader('Content-Type', 'application/json');
+  xhr.onload = function() {
+    btn.disabled = false;
+    btn.textContent = '💾 保存到 YAML';
+    if (xhr.status === 200) {
+      showToast('✅ 已保存到 _data/notes.yml，可以执行 git push 了！', false);
+    } else {
+      showToast('❌ 保存失败: ' + xhr.responseText, true);
+    }
+  };
+  xhr.onerror = function() {
+    btn.disabled = false;
+    btn.textContent = '💾 保存到 YAML';
+    showToast('❌ 网络错误，请重试', true);
+  };
+  xhr.send(JSON.stringify(data));
+}
+
+function showToast(msg, isError) {
+  var t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (isError ? ' error' : '');
+  setTimeout(function() { t.classList.remove('show'); }, 3000);
+}
+
+// 页面加载时自动保存的快捷键 Ctrl+S
+document.addEventListener('keydown', function(e) {
+  if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+    e.preventDefault();
+    saveAll();
+  }
+});
+
+render();
+</script>
+</body>
+</html>

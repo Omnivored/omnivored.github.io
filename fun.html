@@ -1,331 +1,817 @@
 ---
 layout: page
 title: "FUN"
-description: "Game Record Archive — 游戏记录存档"
+description: "Game Screenshot Gallery — 游戏截图展示与存档"
 header-img: "img/tag-bg.jpg"
 ---
 
 <style>
-.tag-filter {
-  margin-bottom: 30px;
-  padding: 15px 0;
-  border-bottom: 1px solid #eee;
+/* ===== 全局 ===== */
+:root {
+  --primary: #2c3e50;
+  --accent: #e74c3c;
+  --bg-card: #ffffff;
+  --bg-light: #f8f9fa;
+  --border: #e8e8e8;
+  --text: #333;
+  --text-light: #888;
+  --shadow: 0 2px 12px rgba(0,0,0,0.08);
+  --radius: 10px;
 }
-.tag-filter .filter-btn {
-  display: inline-block;
-  padding: 6px 16px;
-  margin: 4px 6px 4px 0;
-  border: 1px solid #ddd;
+* { box-sizing: border-box; }
+body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+
+/* ===== 游戏标签栏 ===== */
+.game-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 28px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid var(--border);
+}
+.game-tab {
+  padding: 8px 22px;
   border-radius: 20px;
+  border: 1px solid var(--border);
   background: #fff;
-  color: #666;
+  color: var(--text-light);
   cursor: pointer;
-  font-size: 13px;
-  transition: all 0.2s;
-}
-.tag-filter .filter-btn:hover,
-.tag-filter .filter-btn.active {
-  background: #333;
-  color: #fff;
-  border-color: #333;
-}
-.game-entry {
-  margin-bottom: 50px;
-  padding: 25px;
-  background: #fafafa;
-  border-radius: 8px;
-  border: 1px solid #eee;
-}
-.game-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 2px solid #333;
-}
-.game-header h2 {
-  margin: 0;
-  font-size: 24px;
-  font-weight: 700;
-}
-.status-badge {
-  display: inline-block;
-  padding: 4px 14px;
-  border-radius: 12px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #fff;
-}
-.status-Playing { background: #2196F3; }
-.status-Completed { background: #4CAF50; }
-.status-Paused { background: #FF9800; }
-.status-Dropped { background: #f44336; }
-.progress-section {
-  margin-bottom: 25px;
-}
-.progress-bar-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.progress-track {
-  flex: 1;
-  height: 12px;
-  background: #e0e0e0;
-  border-radius: 6px;
-  overflow: hidden;
-}
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #2196F3, #4CAF50);
-  border-radius: 6px;
-  transition: width 0.5s;
-}
-.progress-text {
   font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  min-width: 40px;
+  font-weight: 500;
+  transition: all 0.25s;
+  user-select: none;
 }
-.collectibles-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 10px;
-  margin-bottom: 25px;
+.game-tab:hover { border-color: var(--primary); color: var(--primary); }
+.game-tab.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
 }
-.collectible-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 8px 14px;
+.game-tab.add-tab {
+  border-style: dashed;
+  color: var(--accent);
+  border-color: var(--accent);
   background: #fff;
-  border-radius: 6px;
-  border: 1px solid #e8e8e8;
+}
+.game-tab.add-tab:hover { background: #fef2f2; }
+.game-tab-input {
+  padding: 6px 14px;
+  border: 2px solid var(--accent);
+  border-radius: 20px;
   font-size: 14px;
+  outline: none;
+  width: 140px;
 }
-.collectible-name {
-  color: #555;
-}
-.collectible-count {
-  font-weight: 600;
-  color: #333;
-}
-.collectible-count.complete {
-  color: #4CAF50;
-}
-.screenshot-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 18px;
-  margin-bottom: 25px;
-}
-.screenshot-card {
-  background: #fff;
-  border-radius: 6px;
-  overflow: hidden;
-  border: 1px solid #e8e8e8;
-}
-.screenshot-card .img-placeholder {
+
+/* ===== 第一部分：轮播 ===== */
+.carousel-section {
+  position: relative;
   width: 100%;
-  height: 180px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: var(--radius);
+  overflow: hidden;
+  margin-bottom: 40px;
+  background: #1a1a2e;
+  box-shadow: var(--shadow);
+}
+.carousel-track {
+  position: relative;
+  width: 100%;
+  height: 420px;
+  overflow: hidden;
+}
+.carousel-slide {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 0.8s ease;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: 14px;
-  overflow: hidden;
+  background: #1a1a2e;
 }
-.screenshot-card .img-placeholder img {
+.carousel-slide.active {
+  opacity: 1;
+  z-index: 1;
+}
+.carousel-slide img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  display: block;
+}
+.carousel-slide .placeholder {
+  color: #ccc;
+  font-size: 16px;
+  text-align: center;
+  padding: 20px;
+}
+.carousel-slide .placeholder .filename {
+  font-size: 13px;
+  color: #888;
+  margin-top: 8px;
+}
+.carousel-indicators {
+  position: absolute;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 8px;
+  z-index: 5;
+  padding: 4px 12px;
+  background: rgba(0,0,0,0.45);
+  border-radius: 12px;
+}
+.carousel-indicators .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.4);
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.carousel-indicators .dot.active { background: #fff; transform: scale(1.3); }
+.carousel-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  background: rgba(0,0,0,0.5);
+  color: #fff;
+  border: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  opacity: 0.7;
+}
+.carousel-nav:hover { opacity: 1; background: rgba(0,0,0,0.75); }
+.carousel-nav.prev { left: 14px; }
+.carousel-nav.next { right: 14px; }
+.carousel-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 260px;
+  color: #aaa;
+  font-size: 16px;
+}
+
+/* ===== 第二部分：图库与备注 ===== */
+.gallery-section { margin-top: 10px; }
+
+/* 搜索栏 */
+.search-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+}
+.search-bar input {
+  flex: 1;
+  min-width: 200px;
+  padding: 10px 16px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.search-bar input:focus { border-color: var(--primary); }
+.search-bar .stat-info {
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  padding: 0 6px;
+  color: var(--text-light);
+  font-size: 13px;
+}
+
+/* 图片网格 */
+.gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 20px;
+}
+.gallery-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.gallery-card:hover { transform: translateY(-2px); box-shadow: 0 4px 20px rgba(0,0,0,0.12); }
+.gallery-card.hidden { display: none; }
+
+.gallery-card .img-wrap {
+  width: 100%;
+  height: 200px;
+  background: #f0f0f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  cursor: pointer;
+  position: relative;
+}
+.gallery-card .img-wrap img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform 0.3s;
 }
-.screenshot-card .screenshot-info {
-  padding: 12px 14px;
-}
-.screenshot-card .screenshot-tags {
-  margin-bottom: 6px;
-}
-.screenshot-card .screenshot-tags .tag {
-  display: inline-block;
-  padding: 2px 8px;
-  margin: 2px 4px 2px 0;
-  background: #f0f0f0;
-  border-radius: 10px;
-  font-size: 11px;
-  color: #666;
-}
-.screenshot-card .screenshot-desc {
+.gallery-card .img-wrap:hover img { transform: scale(1.05); }
+.gallery-card .img-wrap .placeholder {
+  color: #aaa;
   font-size: 13px;
-  color: #555;
-  line-height: 1.4;
-}
-.guide-section {
-  margin-top: 20px;
-}
-.guide-toggle {
-  display: inline-block;
-  padding: 8px 20px;
-  background: #333;
-  color: #fff;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
-  font-size: 14px;
-  transition: background 0.2s;
-}
-.guide-toggle:hover {
-  background: #555;
-}
-.guide-content {
-  display: none;
-  margin-top: 15px;
+  text-align: center;
   padding: 20px;
-  background: #fff;
-  border-radius: 6px;
-  border: 1px solid #e8e8e8;
-  line-height: 1.8;
-  font-size: 14px;
-  color: #444;
 }
-.guide-content.open {
+
+/* 备注区域 */
+.notes-area {
+  padding: 14px 16px 16px;
+}
+.notes-area .filename {
+  font-size: 12px;
+  color: var(--text-light);
+  margin-bottom: 10px;
+  word-break: break-all;
+}
+.note-field {
+  margin-bottom: 10px;
+}
+.note-field:last-child { margin-bottom: 0; }
+.note-field label {
   display: block;
-}
-.game-section-title {
-  font-size: 16px;
+  font-size: 12px;
   font-weight: 600;
-  color: #333;
-  margin: 20px 0 12px 0;
-  padding-bottom: 6px;
-  border-bottom: 1px solid #ddd;
+  color: var(--text-light);
+  margin-bottom: 3px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
 }
+.note-field input,
+.note-field textarea {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  transition: border-color 0.2s;
+  font-family: inherit;
+  background: var(--bg-light);
+}
+.note-field input:focus,
+.note-field textarea:focus {
+  border-color: var(--accent);
+  background: #fff;
+}
+.note-field textarea {
+  resize: vertical;
+  min-height: 44px;
+}
+.note-field input::placeholder,
+.note-field textarea::placeholder { color: #ccc; }
+
+/* YAML 源提示 */
+.yaml-source-hint {
+  font-size: 11px;
+  color: #aaa;
+  text-align: right;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #f0f0f0;
+}
+.yaml-source-hint a {
+  color: #888;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+}
+.yaml-source-hint a:hover { color: var(--accent); }
+
+/* 模态框：大图预览 */
+.modal-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.85);
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.modal-overlay.open { display: flex; }
+.modal-overlay img {
+  max-width: 90vw;
+  max-height: 90vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 8px 40px rgba(0,0,0,0.5);
+}
+.modal-overlay .close-btn {
+  position: absolute;
+  top: 20px;
+  right: 30px;
+  color: #fff;
+  font-size: 32px;
+  cursor: pointer;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+.modal-overlay .close-btn:hover { opacity: 1; }
+
+/* ===== 响应式 ===== */
 @media (max-width: 768px) {
-  .screenshot-grid {
-    grid-template-columns: 1fr;
-  }
-  .collectibles-grid {
-    grid-template-columns: 1fr;
-  }
-  .game-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
+  .carousel-track { height: 260px; }
+  .carousel-nav { width: 32px; height: 32px; font-size: 16px; }
+  .carousel-nav.prev { left: 8px; }
+  .carousel-nav.next { right: 8px; }
+  .gallery-grid { grid-template-columns: 1fr; }
+  .game-tab { padding: 6px 16px; font-size: 13px; }
+  .search-bar input { min-width: 140px; }
 }
 </style>
 
-<div class="tag-filter" id="tagFilter">
-  <span class="filter-btn all-btn active" data-tag="all" onclick="filterByTag('all')">All</span>
-</div>
+<!-- ============================================================ -->
+<!-- 数据层：由 Liquid 在构建时渲染为 JavaScript                    -->
+<!-- 数据来源（优先级从高到低）：                                  -->
+<!--   1. _data/notes.yml 中的 src 字段 → R2 CDN URL              -->
+<!--   2. site.static_files 自动发现 → 本地 img/games/ 目录       -->
+<!-- 备注始终从 _data/notes.yml 读取                              -->
+<!-- ============================================================ -->
+<script>
+// ================================================================
+// 第一部分：从 _data/notes.yml 读取图片 + 备注
+// 此文件支持 src 字段指向 R2 CDN 地址，无需将图片存入仓库
+// ================================================================
+var NOTES_DATA = {};
+var SCREENSHOT_DATA = {};
 
-<div id="gameList">
-{% for game in site.data.games %}
-  <div class="game-entry" data-tags="{{ game.tags | join: ',' }}">
-    <div class="game-header">
-      <h2>{{ game.name }}</h2>
-      <span class="status-badge status-{{ game.status }}">{{ game.status }}</span>
-    </div>
+{% for game_entry in site.data.notes %}
+  {% assign game_id = game_entry[0] %}
+  {% assign notes_for_game = game_entry[1] %}
+  NOTES_DATA['{{ game_id }}'] = {};
+  if (!SCREENSHOT_DATA['{{ game_id }}']) SCREENSHOT_DATA['{{ game_id }}'] = [];
 
-    <div class="progress-section">
-      <div class="progress-bar-wrapper">
-        <span class="progress-text">{{ game.progress }}%</span>
-        <div class="progress-track">
-          <div class="progress-fill" style="width: {{ game.progress }}%"></div>
-        </div>
-      </div>
-    </div>
-
-    {% if game.collectibles %}
-    <div class="game-section-title">Collectibles Progress</div>
-    <div class="collectibles-grid">
-      {% for item in game.collectibles %}
-      <div class="collectible-item">
-        <span class="collectible-name">{{ item.name }}</span>
-        {% if item.found >= item.total %}
-        <span class="collectible-count complete">{{ item.found }}/{{ item.total }}</span>
-        {% else %}
-        <span class="collectible-count">{{ item.found }}/{{ item.total }}</span>
-        {% endif %}
-      </div>
-      {% endfor %}
-    </div>
+  {% for note_entry in notes_for_game %}
+    {% assign filename = note_entry[0] %}
+    {% assign note = note_entry[1] %}
+    // 图片数据
+    {% if note.src %}
+      // 有 R2 远程地址
+      var imgSrc = '{{ note.src }}';
+    {% else %}
+      // 无远程地址，使用本地路径（需将图片放入 img/games/）
+      var imgSrc = '{{ site.baseurl }}/img/games/{{ game_id }}/{{ filename }}';
     {% endif %}
+    SCREENSHOT_DATA['{{ game_id }}'].push({ "src": imgSrc, "filename": "{{ filename }}" });
 
-    {% if game.screenshots %}
-    <div class="game-section-title">Screenshots</div>
-    <div class="screenshot-grid">
-      {% for shot in game.screenshots %}
-      <div class="screenshot-card">
-        <div class="img-placeholder">
-          {% if shot.src %}
-          <img src="{{ site.baseurl }}/{{ shot.src }}" alt="{{ shot.description }}" loading="lazy" onerror="this.parentElement.innerHTML='Screenshot: '+this.alt">
-          {% endif %}
-        </div>
-        <div class="screenshot-info">
-          <div class="screenshot-tags">
-            {% for tag in shot.tags %}
-            <span class="tag">{{ tag }}</span>
-            {% endfor %}
-          </div>
-          <div class="screenshot-desc">{{ shot.description }}</div>
-        </div>
-      </div>
-      {% endfor %}
-    </div>
-    {% endif %}
-
-    {% if game.guide %}
-    <div class="guide-section">
-      <button class="guide-toggle" onclick="toggleGuide(this)">View Guide</button>
-      <div class="guide-content">{{ game.guide | markdownify }}</div>
-    </div>
-    {% endif %}
-  </div>
+    // 备注数据
+    NOTES_DATA['{{ game_id }}']['{{ filename }}'] = {
+      outfitCode: {{ note.outfitCode | default: null | jsonify }},
+      cameraParams: {{ note.cameraParams | default: null | jsonify }},
+      themeWords: {{ note.themeWords | default: null | jsonify }},
+      customNotes: {{ note.customNotes | default: '' | jsonify }}
+    };
+  {% endfor %}
 {% endfor %}
+
+// ================================================================
+// 第二部分：补充未在 notes.yml 中注册的本地图片
+// 从 site.static_files 自动发现 img/games/ 下的未被注册的图片
+// ================================================================
+{% for file in site.static_files %}
+  {% assign ext = file.extname | downcase %}
+  {% if file.path contains '/img/games/' and ext != '.webp' and ext != '.jpg' and ext != '.jpeg' and ext != '.png' and ext != '.gif' %}
+    {% continue %}
+  {% endif %}
+  {% if file.path contains '/img/games/' %}
+    {% assign parts = file.path | split: '/' %}
+    {% assign game_id = parts[2] %}
+    {% assign filename = file.name %}
+    {% assign local_path = site.baseurl %}{{ file.path }}
+    // 如果该图片未被 notes.yml 注册，则用本地路径
+    if (!SCREENSHOT_DATA['{{ game_id }}']) SCREENSHOT_DATA['{{ game_id }}'] = [];
+    var alreadyRegistered = false;
+    if (SCREENSHOT_DATA['{{ game_id }}']) {
+      for (var _i = 0; _i < SCREENSHOT_DATA['{{ game_id }}'].length; _i++) {
+        if (SCREENSHOT_DATA['{{ game_id }}'][_i].filename === '{{ filename }}') {
+          alreadyRegistered = true; break;
+        }
+      }
+    }
+    if (!alreadyRegistered) {
+      SCREENSHOT_DATA['{{ game_id }}'].push({ "src": "{{ local_path }}", "filename": "{{ filename }}" });
+    }
+  {% endif %}
+{% endfor %}
+
+// ================================================================
+// 游戏元信息 — 从所有图片数据中提取游戏列表
+// ================================================================
+var GAME_META = {};
+(function() {
+  var gameIds = Object.keys(SCREENSHOT_DATA);
+  gameIds.forEach(function(id) {
+    GAME_META[id] = { name: id.charAt(0).toUpperCase() + id.slice(1) };
+  });
+  // 确保 Nikki 和 FF14 至少显示为标签
+  if (!GAME_META.nikki) GAME_META.nikki = { name: "Nikki" };
+  if (!GAME_META.ff14)  GAME_META.ff14  = { name: "FF14" };
+  if (!SCREENSHOT_DATA.nikki) SCREENSHOT_DATA.nikki = [];
+  if (!SCREENSHOT_DATA.ff14)  SCREENSHOT_DATA.ff14  = [];
+})();
+</script>
+
+<!-- ============================================================ -->
+<!-- HTML 结构                                                     -->
+<!-- ============================================================ -->
+
+<!-- 游戏切换标签 -->
+<div class="game-tabs" id="gameTabs"></div>
+
+<!-- 第一部分：轮播 -->
+<section class="carousel-section" id="carouselSection">
+  <div class="carousel-track" id="carouselTrack"></div>
+  <div class="carousel-indicators" id="carouselDots"></div>
+  <button class="carousel-nav prev" id="carouselPrev">‹</button>
+  <button class="carousel-nav next" id="carouselNext">›</button>
+</section>
+
+<!-- 第二部分：图库与备注 -->
+<section class="gallery-section">
+  <div class="search-bar">
+    <input type="text" id="searchInput" placeholder="搜索备注内容（搭配码、镜头参数、主题词、自定义备注）…" />
+    <span class="stat-info" id="statInfo">共 0 张</span>
+  </div>
+  <div class="gallery-grid" id="galleryGrid"></div>
+</section>
+
+<!-- 大图预览模态框 -->
+<div class="modal-overlay" id="imageModal">
+  <span class="close-btn" id="modalClose">×</span>
+  <img id="modalImg" src="" alt="preview" />
 </div>
 
+<!-- ============================================================ -->
+<!-- JavaScript 主逻辑                                              -->
+<!-- ============================================================ -->
 <script>
 (function() {
-  var tagsSet = new Set();
-  document.querySelectorAll('.game-entry').forEach(function(game) {
-    (game.getAttribute('data-tags') || '').split(',').forEach(function(t) {
-      var trimmed = t.trim();
-      if (trimmed) tagsSet.add(trimmed);
-    });
-  });
-  var sortedTags = Array.from(tagsSet).sort();
-  var filterBar = document.getElementById('tagFilter');
-  sortedTags.forEach(function(tag) {
-    var btn = document.createElement('span');
-    btn.className = 'filter-btn';
-    btn.textContent = tag;
-    btn.setAttribute('data-tag', tag);
-    btn.onclick = function() { filterByTag(tag); };
-    filterBar.appendChild(btn);
-  });
-})();
+  'use strict';
 
-function filterByTag(tag) {
-  document.querySelectorAll('.filter-btn').forEach(function(b) {
-    b.classList.toggle('active', b.getAttribute('data-tag') === tag);
-  });
-  document.querySelectorAll('.game-entry').forEach(function(game) {
-    if (tag === 'all') {
-      game.style.display = '';
-    } else {
-      var gameTags = (game.getAttribute('data-tags') || '').split(',');
-      game.style.display = gameTags.indexOf(tag) > -1 ? '' : 'none';
-    }
-  });
-}
+  // ---- 配置 ----
+  var CAROUSEL_INTERVAL = 1500; // 1.5 秒
+  var STORAGE_KEY = 'hux_fun_notes_overlay';
 
-function toggleGuide(btn) {
-  var content = btn.nextElementSibling;
-  if (content) {
-    content.classList.toggle('open');
-    btn.textContent = content.classList.contains('open') ? 'Hide Guide' : 'View Guide';
+  // ---- 状态 ----
+  var currentGame = null;
+  var carouselTimer = null;
+  var currentSlide = 0;
+
+  // ---- DOM 引用 ----
+  var $tabs      = document.getElementById('gameTabs');
+  var $track     = document.getElementById('carouselTrack');
+  var $dots      = document.getElementById('carouselDots');
+  var $prevBtn   = document.getElementById('carouselPrev');
+  var $nextBtn   = document.getElementById('carouselNext');
+  var $grid      = document.getElementById('galleryGrid');
+  var $search    = document.getElementById('searchInput');
+  var $statInfo  = document.getElementById('statInfo');
+  var $modal     = document.getElementById('imageModal');
+  var $modalImg  = document.getElementById('modalImg');
+  var $modalClose= document.getElementById('modalClose');
+
+  // ---- 备注数据：合并 YAML 文件 + localStorage 覆盖层 ----
+  function loadOverlay() {
+    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
+    catch(e) { return {}; }
   }
-}
+  function saveOverlay(overlay) {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(overlay));
+  }
+  function getNoteKey(gameId, filename) {
+    return gameId + '/' + filename;
+  }
+
+  /**
+   * 获取某张图片的备注：先查 YAML 文件数据，再合并 localStorage 覆盖层
+   */
+  function getNote(gameId, filename) {
+    // 从 YAML 文件获取基础数据
+    var fileNote = null;
+    if (NOTES_DATA[gameId] && NOTES_DATA[gameId][filename]) {
+      fileNote = NOTES_DATA[gameId][filename];
+    }
+    // 从 localStorage 读取覆盖层
+    var overlay = loadOverlay();
+    var overlayNote = overlay[getNoteKey(gameId, filename)];
+
+    if (fileNote && overlayNote) {
+      // 合并：覆盖层优先
+      return {
+        outfitCode: overlayNote.outfitCode !== undefined ? overlayNote.outfitCode : fileNote.outfitCode,
+        cameraParams: overlayNote.cameraParams !== undefined ? overlayNote.cameraParams : fileNote.cameraParams,
+        themeWords: overlayNote.themeWords !== undefined ? overlayNote.themeWords : fileNote.themeWords,
+        customNotes: overlayNote.customNotes !== undefined ? overlayNote.customNotes : fileNote.customNotes
+      };
+    } else if (overlayNote) {
+      return overlayNote;
+    } else if (fileNote) {
+      return fileNote;
+    }
+    // 默认值
+    return { outfitCode: null, cameraParams: null, themeWords: null, customNotes: '' };
+  }
+
+  /**
+   * 设置某张图片的备注（写入 localStorage 覆盖层）
+   */
+  function setNote(gameId, filename, field, value) {
+    var overlay = loadOverlay();
+    var key = getNoteKey(gameId, filename);
+    if (!overlay[key]) {
+      overlay[key] = { outfitCode: null, cameraParams: null, themeWords: null, customNotes: '' };
+    }
+    overlay[key][field] = value || null;
+    saveOverlay(overlay);
+  }
+
+  /**
+   * 判断一张图片是否有 YAML 文件来源的备注
+   */
+  function hasFileNote(gameId, filename) {
+    return !!(NOTES_DATA[gameId] && NOTES_DATA[gameId][filename]);
+  }
+
+  // ---- 获取当前游戏的图片列表 ----
+  function getImages(gameId) {
+    return SCREENSHOT_DATA[gameId] || [];
+  }
+
+  // ---- 渲染游戏标签 ----
+  function renderTabs() {
+    var gameIds = Object.keys(GAME_META);
+    var html = '';
+    gameIds.forEach(function(id) {
+      html += '<span class="game-tab' + (id === currentGame ? ' active' : '') + '" data-game="' + id + '">' + GAME_META[id].name + '</span>';
+    });
+    html += '<span class="game-tab add-tab" id="addGameBtn">+ 添加游戏</span>';
+    $tabs.innerHTML = html;
+
+    $tabs.querySelectorAll('.game-tab:not(.add-tab)').forEach(function(tab) {
+      tab.addEventListener('click', function() {
+        switchGame(this.getAttribute('data-game'));
+      });
+    });
+    document.getElementById('addGameBtn').addEventListener('click', function() {
+      var name = prompt('请输入新游戏名称（英文或拼音，将作为文件夹名）：\n\n提示：添加后在 img/games/{名称}/ 放入图片即可自动显示。');
+      if (name && name.trim()) {
+        name = name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
+        if (!name) { alert('名称无效，请使用英文字母、数字、下划线或连字符。'); return; }
+        if (GAME_META[name]) { alert('该游戏已存在！'); return; }
+        GAME_META[name] = { name: name.charAt(0).toUpperCase() + name.slice(1) };
+        SCREENSHOT_DATA[name] = [];
+        if (currentGame) {
+          switchGame(name);
+        } else {
+          currentGame = name;
+          renderTabs();
+          renderAll();
+        }
+      }
+    });
+  }
+
+  // ---- 切换游戏 ----
+  function switchGame(gameId) {
+    if (gameId === currentGame) return;
+    stopCarousel();
+    currentGame = gameId;
+    renderTabs();
+    renderAll();
+  }
+
+  // ---- 渲染轮播 ----
+  function renderCarousel() {
+    var images = getImages(currentGame);
+    $track.innerHTML = '';
+    $dots.innerHTML = '';
+
+    if (images.length === 0) {
+      $track.innerHTML = '<div class="carousel-empty">暂无截图，请将图片放入 img/games/' + currentGame + '/ 目录</div>';
+      $dots.innerHTML = '';
+      return;
+    }
+
+    images.forEach(function(img, idx) {
+      var slide = document.createElement('div');
+      slide.className = 'carousel-slide' + (idx === 0 ? ' active' : '');
+      slide.innerHTML = '<img src="' + img.src + '" alt="' + img.filename + '" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div class=placeholder>📷<br><span class=filename>\'+this.alt+\'</span></div>\'" />';
+      $track.appendChild(slide);
+
+      var dot = document.createElement('span');
+      dot.className = 'dot' + (idx === 0 ? ' active' : '');
+      dot.dataset.index = idx;
+      dot.addEventListener('click', function() { goToSlide(parseInt(this.dataset.index)); });
+      $dots.appendChild(dot);
+    });
+
+    currentSlide = 0;
+    startCarousel();
+  }
+
+  // ---- 轮播控制 ----
+  function goToSlide(index) {
+    var slides = $track.querySelectorAll('.carousel-slide');
+    var dots  = $dots.querySelectorAll('.dot');
+    if (index < 0) index = slides.length - 1;
+    if (index >= slides.length) index = 0;
+    slides.forEach(function(s, i) { s.classList.toggle('active', i === index); });
+    dots.forEach(function(d, i) { d.classList.toggle('active', i === index); });
+    currentSlide = index;
+    resetCarouselTimer();
+  }
+
+  function nextSlide() { goToSlide(currentSlide + 1); }
+  function prevSlide() { goToSlide(currentSlide - 1); }
+
+  function startCarousel() {
+    stopCarousel();
+    var images = getImages(currentGame);
+    if (images.length < 2) return;
+    carouselTimer = setInterval(nextSlide, CAROUSEL_INTERVAL);
+  }
+
+  function stopCarousel() {
+    if (carouselTimer) { clearInterval(carouselTimer); carouselTimer = null; }
+  }
+
+  function resetCarouselTimer() {
+    stopCarousel();
+    startCarousel();
+  }
+
+  // ---- 渲染图库与备注 ----
+  function renderGallery() {
+    var images = getImages(currentGame);
+    var searchTerm = $search.value.trim().toLowerCase();
+
+    if (images.length === 0) {
+      $grid.innerHTML = '<div style="text-align:center;padding:60px 0;color:#aaa;font-size:15px;">暂无截图，请将图片放入 img/games/' + currentGame + '/ 目录</div>';
+      $statInfo.textContent = '共 0 张';
+      return;
+    }
+
+    var html = '';
+    var visibleCount = 0;
+
+    images.forEach(function(img) {
+      var note = getNote(currentGame, img.filename);
+      var fromFile = hasFileNote(currentGame, img.filename);
+
+      // 搜索过滤
+      if (searchTerm) {
+        var searchable = [
+          (note.outfitCode || ''),
+          (note.cameraParams || ''),
+          (note.themeWords || ''),
+          (note.customNotes || '')
+        ].join(' ').toLowerCase();
+        if (searchable.indexOf(searchTerm) === -1) {
+          html += '<div class="gallery-card hidden" data-filename="' + img.filename + '">';
+          html += '</div>';
+          return;
+        }
+      }
+      visibleCount++;
+
+      html += '<div class="gallery-card" data-filename="' + img.filename + '">';
+      html += '  <div class="img-wrap" data-src="' + img.src + '">';
+      html += '    <img src="' + img.src + '" alt="' + img.filename + '" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div class=placeholder>📷 ' + img.filename + '</div>\'" />';
+      html += '  </div>';
+      html += '  <div class="notes-area">';
+      html += '    <div class="filename">' + img.filename + '</div>';
+      // 搭配码
+      html += '    <div class="note-field">';
+      html += '      <label>搭配码</label>';
+      html += '      <input type="text" class="note-input" data-field="outfitCode" value="' + escAttr(note.outfitCode || '') + '" placeholder="null" />';
+      html += '    </div>';
+      // 镜头参数
+      html += '    <div class="note-field">';
+      html += '      <label>镜头参数</label>';
+      html += '      <input type="text" class="note-input" data-field="cameraParams" value="' + escAttr(note.cameraParams || '') + '" placeholder="null" />';
+      html += '    </div>';
+      // 主题词
+      html += '    <div class="note-field">';
+      html += '      <label>主题词</label>';
+      html += '      <input type="text" class="note-input" data-field="themeWords" value="' + escAttr(note.themeWords || '') + '" placeholder="null" />';
+      html += '    </div>';
+      // 自定义备注
+      html += '    <div class="note-field">';
+      html += '      <label>自定义备注</label>';
+      html += '      <textarea class="note-input" data-field="customNotes" rows="2" placeholder="输入自定义备注…">' + escHtml(note.customNotes || '') + '</textarea>';
+      html += '    </div>';
+      // YAML 来源提示
+      if (fromFile) {
+        html += '    <div class="yaml-source-hint">📄 来自 <a href="{{ site.baseurl }}/_data/notes.yml" target="_blank">_data/notes.yml</a></div>';
+      } else {
+        html += '    <div class="yaml-source-hint">✏️ 编辑 <a href="{{ site.baseurl }}/_data/notes.yml" target="_blank">_data/notes.yml</a> 可永久保存备注</div>';
+      }
+      html += '  </div>';
+      html += '</div>';
+    });
+
+    $grid.innerHTML = html;
+    $statInfo.textContent = '共 ' + images.length + ' 张' + (searchTerm ? '，匹配 ' + visibleCount + ' 张' : '');
+
+    // 绑定备注输入事件
+    $grid.querySelectorAll('.note-input').forEach(function(el) {
+      el.addEventListener('input', function() {
+        var card = this.closest('.gallery-card');
+        var filename = card.getAttribute('data-filename');
+        var field = this.getAttribute('data-field');
+        setNote(currentGame, filename, field, this.value || null);
+      });
+    });
+
+    // 绑定大图预览
+    $grid.querySelectorAll('.img-wrap').forEach(function(wrap) {
+      wrap.addEventListener('click', function() {
+        var src = this.getAttribute('data-src');
+        if (src) {
+          $modalImg.src = src;
+          $modal.classList.add('open');
+        }
+      });
+    });
+  }
+
+  // ---- 工具：HTML 转义 ----
+  function escAttr(s) { return s.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  function escHtml(s) { return s.replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+
+  // ---- 全部渲染 ----
+  function renderAll() {
+    renderCarousel();
+    renderGallery();
+  }
+
+  // ---- 初始化 ----
+  function init() {
+    var gameIds = Object.keys(GAME_META);
+    if (gameIds.length === 0) return;
+    var defaultGame = gameIds[0];
+    for (var i = 0; i < gameIds.length; i++) {
+      if (getImages(gameIds[i]).length > 0) { defaultGame = gameIds[i]; break; }
+    }
+    currentGame = defaultGame;
+    renderTabs();
+
+    // 导航按钮
+    $prevBtn.addEventListener('click', function(e) { e.stopPropagation(); prevSlide(); });
+    $nextBtn.addEventListener('click', function(e) { e.stopPropagation(); nextSlide(); });
+
+    // 搜索防抖
+    var searchTimer = null;
+    $search.addEventListener('input', function() {
+      if (searchTimer) clearTimeout(searchTimer);
+      searchTimer = setTimeout(renderGallery, 200);
+    });
+
+    // 模态框关闭
+    $modalClose.addEventListener('click', function() { $modal.classList.remove('open'); });
+    $modal.addEventListener('click', function(e) {
+      if (e.target === $modal) $modal.classList.remove('open');
+    });
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'Escape') $modal.classList.remove('open');
+    });
+
+    // 键盘控制轮播
+    document.addEventListener('keydown', function(e) {
+      if (e.key === 'ArrowLeft' && $modal.classList.contains('open')) return;
+      if (e.key === 'ArrowRight' && $modal.classList.contains('open')) return;
+      if (e.key === 'ArrowLeft') prevSlide();
+      if (e.key === 'ArrowRight') nextSlide();
+    });
+
+    // 鼠标悬停暂停轮播
+    $track.addEventListener('mouseenter', stopCarousel);
+    $track.addEventListener('mouseleave', startCarousel);
+
+    renderAll();
+  }
+
+  init();
+})();
 </script>
