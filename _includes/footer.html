@@ -72,6 +72,12 @@
                 <p class="copyright text-muted">
                     Copyright &copy; {{ site.title }} {{ site.time | date: '%Y' }}
                     <br>
+                    <span id="busuanzi_container_site_pv" style="display:none;">
+                        📊 总访问量 <span id="busuanzi_value_site_pv"></span> 次
+                        &nbsp;|&nbsp;
+                        👥 访客数 <span id="busuanzi_value_site_uv"></span> 人
+                    </span>
+                    <br>
                     Theme by <a href="http://huangxuan.me">Hux</a> |
                     <iframe
                         style="margin-left: 2px; margin-bottom:-5px;"
@@ -183,3 +189,6 @@
     })();
 </script>
 {% endif %}
+
+<!-- Busuanzi Page View Counter -->
+<script async src="//busuanzi.ibruce.info/busuanzi/2.3/busuanzi.pure.mini.js"></script>
