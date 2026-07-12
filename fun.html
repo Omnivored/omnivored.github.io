@@ -371,7 +371,7 @@ var SCREENSHOT_DATA = {};
       var imgSrc = {{ note.src | jsonify }};
     {% else %}
       // 无远程地址，使用本地路径（将图片放入 img/games/）
-      var imgSrc = {{ site.baseurl | append: '/img/games/' | append: game_id | append: '/' | append: filename | jsonify }};
+      var imgSrc = {{ site.baseurl | append: '/' | append: 'img/games/' | append: game_id | append: '/' | append: filename | replace: '//', '/' | jsonify }};
     {% endif %}
     SCREENSHOT_DATA[{{ game_id | jsonify }}].push({ "src": imgSrc, "filename": {{ filename | jsonify }} });
 
@@ -400,7 +400,7 @@ var SCREENSHOT_DATA = {};
     {% assign parts = file.path | split: '/' %}
     {% assign game_id = parts[parts.size | minus: 2] %}
     {% assign filename = file.name %}
-    {% assign local_path = site.baseurl | append: file.path %}
+    {% assign local_path = site.baseurl | append: '/' | append: file.path | replace: '//', '/' %}
     // 如果该图片未被 notes.yml 注册，则用本地路径
     if ({{ game_id | jsonify }} && !SCREENSHOT_DATA[{{ game_id | jsonify }}]) SCREENSHOT_DATA[{{ game_id | jsonify }}] = [];
     var alreadyRegistered = false;
