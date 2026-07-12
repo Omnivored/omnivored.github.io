@@ -399,7 +399,7 @@ var SCREENSHOT_DATA = {};
     {% assign parts = file.path | split: '/' %}
     {% assign game_id = parts[parts.size | minus: 2] %}
     {% assign filename = file.name %}
-    {% assign local_path = site.baseurl %}{{ file.path }}
+    {% assign local_path = site.baseurl | append: '/' | append: file.path %}
     // 如果该图片未被 notes.yml 注册，则用本地路径
     if (!SCREENSHOT_DATA['{{ game_id }}']) SCREENSHOT_DATA['{{ game_id }}'] = [];
     var alreadyRegistered = false;
