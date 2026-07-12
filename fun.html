@@ -411,10 +411,7 @@ var GAME_META = {};
 <!-- HTML 结构                                                     -->
 <!-- ============================================================ -->
 
-<!-- 游戏切换标签 -->
-<div class="game-tabs" id="gameTabs"></div>
-
-<!-- 第一部分：轮播 -->
+<!-- 第一部分：轮播（所有游戏的所有图片） -->
 <section class="carousel-section" id="carouselSection">
   <div class="carousel-track" id="carouselTrack"></div>
   <div class="carousel-indicators" id="carouselDots"></div>
@@ -422,12 +419,22 @@ var GAME_META = {};
   <button class="carousel-nav next" id="carouselNext">›</button>
 </section>
 
-<!-- 第二部分：图库与备注 -->
+<!-- 第二部分：模式切换 + 图库 -->
 <section class="gallery-section">
-  <div class="search-bar">
-    <input type="text" id="searchInput" placeholder="搜索备注内容（搭配码、镜头参数、主题词、自定义备注）…" />
-    <span class="stat-info" id="statInfo">共 0 张</span>
+  <!-- 模式切换标签 -->
+  <div class="game-tabs" id="modeTabs">
+    <span class="game-tab active" data-mode="search">🔍 检索</span>
+    <span class="game-tab" data-mode="recent">🕐 最近</span>
   </div>
+
+  <!-- 检索模式 -->
+  <div id="searchMode">
+    <div class="search-bar">
+      <input type="text" id="searchInput" placeholder="搜索备注内容（搭配码、镜头参数、主题词、自定义备注）…" />
+      <span class="stat-info" id="statInfo">共 0 张</span>
+    </div>
+  </div>
+
   <div class="gallery-grid" id="galleryGrid"></div>
 </section>
 
@@ -435,6 +442,12 @@ var GAME_META = {};
 <div class="modal-overlay" id="imageModal">
   <span class="close-btn" id="modalClose">×</span>
   <img id="modalImg" src="" alt="preview" />
+</div>
+
+<!-- 备注悬浮窗 -->
+<div class="modal-overlay" id="noteModal" style="cursor:default;">
+  <span class="close-btn" id="noteModalClose">×</span>
+  <div id="noteModalContent" style="background:#fff;border-radius:12px;padding:24px 28px;max-width:480px;width:90vw;cursor:auto;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.3);"></div>
 </div>
 
 <!-- ============================================================ -->
@@ -446,15 +459,14 @@ var GAME_META = {};
 
   // ---- 配置 ----
   var CAROUSEL_INTERVAL = 1500; // 1.5 秒
-  var STORAGE_KEY = 'hux_fun_notes_overlay';
+  var RECENT_COUNT = 10;
 
   // ---- 状态 ----
-  var currentGame = null;
   var carouselTimer = null;
   var currentSlide = 0;
+  var currentMode = 'search'; // 'search' or 'recent'
 
   // ---- DOM 引用 ----
-  var $tabs      = document.getElementById('gameTabs');
   var $track     = document.getElementById('carouselTrack');
   var $dots      = document.getElementById('carouselDots');
   var $prevBtn   = document.getElementById('carouselPrev');
@@ -462,129 +474,46 @@ var GAME_META = {};
   var $grid      = document.getElementById('galleryGrid');
   var $search    = document.getElementById('searchInput');
   var $statInfo  = document.getElementById('statInfo');
-  var $modal     = document.getElementById('imageModal');
-  var $modalImg  = document.getElementById('modalImg');
-  var $modalClose= document.getElementById('modalClose');
+  var $imgModal  = document.getElementById('imageModal');
+  var $imgModalImg = document.getElementById('modalImg');
+  var $imgModalClose = document.getElementById('modalClose');
+  var $noteModal = document.getElementById('noteModal');
+  var $noteModalContent = document.getElementById('noteModalContent');
+  var $noteModalClose = document.getElementById('noteModalClose');
 
-  // ---- 备注数据：合并 YAML 文件 + localStorage 覆盖层 ----
-  function loadOverlay() {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY)) || {}; }
-    catch(e) { return {}; }
-  }
-  function saveOverlay(overlay) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(overlay));
-  }
-  function getNoteKey(gameId, filename) {
-    return gameId + '/' + filename;
+  // ---- 获取所有图片（合并所有游戏） ----
+  function getAllImages() {
+    var all = [];
+    var gameIds = Object.keys(SCREENSHOT_DATA);
+    gameIds.forEach(function(id) {
+      (SCREENSHOT_DATA[id] || []).forEach(function(img) {
+        all.push({ gameId: id, src: img.src, filename: img.filename });
+      });
+    });
+    return all;
   }
 
-  /**
-   * 获取某张图片的备注：先查 YAML 文件数据，再合并 localStorage 覆盖层
-   */
+  // ---- 获取备注 ----
   function getNote(gameId, filename) {
-    // 从 YAML 文件获取基础数据
-    var fileNote = null;
     if (NOTES_DATA[gameId] && NOTES_DATA[gameId][filename]) {
-      fileNote = NOTES_DATA[gameId][filename];
+      return NOTES_DATA[gameId][filename];
     }
-    // 从 localStorage 读取覆盖层
-    var overlay = loadOverlay();
-    var overlayNote = overlay[getNoteKey(gameId, filename)];
-
-    if (fileNote && overlayNote) {
-      // 合并：覆盖层优先
-      return {
-        outfitCode: overlayNote.outfitCode !== undefined ? overlayNote.outfitCode : fileNote.outfitCode,
-        cameraParams: overlayNote.cameraParams !== undefined ? overlayNote.cameraParams : fileNote.cameraParams,
-        themeWords: overlayNote.themeWords !== undefined ? overlayNote.themeWords : fileNote.themeWords,
-        customNotes: overlayNote.customNotes !== undefined ? overlayNote.customNotes : fileNote.customNotes
-      };
-    } else if (overlayNote) {
-      return overlayNote;
-    } else if (fileNote) {
-      return fileNote;
-    }
-    // 默认值
     return { outfitCode: null, cameraParams: null, themeWords: null, customNotes: '' };
   }
 
-  /**
-   * 设置某张图片的备注（写入 localStorage 覆盖层）
-   */
-  function setNote(gameId, filename, field, value) {
-    var overlay = loadOverlay();
-    var key = getNoteKey(gameId, filename);
-    if (!overlay[key]) {
-      overlay[key] = { outfitCode: null, cameraParams: null, themeWords: null, customNotes: '' };
-    }
-    overlay[key][field] = value || null;
-    saveOverlay(overlay);
+  function hasNote(gameId, filename) {
+    var note = getNote(gameId, filename);
+    return note.outfitCode || note.cameraParams || note.themeWords || note.customNotes;
   }
 
-  /**
-   * 判断一张图片是否有 YAML 文件来源的备注
-   */
-  function hasFileNote(gameId, filename) {
-    return !!(NOTES_DATA[gameId] && NOTES_DATA[gameId][filename]);
-  }
-
-  // ---- 获取当前游戏的图片列表 ----
-  function getImages(gameId) {
-    return SCREENSHOT_DATA[gameId] || [];
-  }
-
-  // ---- 渲染游戏标签 ----
-  function renderTabs() {
-    var gameIds = Object.keys(GAME_META);
-    var html = '';
-    gameIds.forEach(function(id) {
-      html += '<span class="game-tab' + (id === currentGame ? ' active' : '') + '" data-game="' + id + '">' + GAME_META[id].name + '</span>';
-    });
-    html += '<span class="game-tab add-tab" id="addGameBtn">+ 添加游戏</span>';
-    $tabs.innerHTML = html;
-
-    $tabs.querySelectorAll('.game-tab:not(.add-tab)').forEach(function(tab) {
-      tab.addEventListener('click', function() {
-        switchGame(this.getAttribute('data-game'));
-      });
-    });
-    document.getElementById('addGameBtn').addEventListener('click', function() {
-      var name = prompt('请输入新游戏名称（英文或拼音，将作为文件夹名）：\n\n提示：添加后在 img/games/{名称}/ 放入图片即可自动显示。');
-      if (name && name.trim()) {
-        name = name.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
-        if (!name) { alert('名称无效，请使用英文字母、数字、下划线或连字符。'); return; }
-        if (GAME_META[name]) { alert('该游戏已存在！'); return; }
-        GAME_META[name] = { name: name.charAt(0).toUpperCase() + name.slice(1) };
-        SCREENSHOT_DATA[name] = [];
-        if (currentGame) {
-          switchGame(name);
-        } else {
-          currentGame = name;
-          renderTabs();
-          renderAll();
-        }
-      }
-    });
-  }
-
-  // ---- 切换游戏 ----
-  function switchGame(gameId) {
-    if (gameId === currentGame) return;
-    stopCarousel();
-    currentGame = gameId;
-    renderTabs();
-    renderAll();
-  }
-
-  // ---- 渲染轮播 ----
+  // ---- 渲染轮播（所有图片） ----
   function renderCarousel() {
-    var images = getImages(currentGame);
+    var images = getAllImages();
     $track.innerHTML = '';
     $dots.innerHTML = '';
 
     if (images.length === 0) {
-      $track.innerHTML = '<div class="carousel-empty">暂无截图，请将图片放入 img/games/' + currentGame + '/ 目录</div>';
-      $dots.innerHTML = '';
+      $track.innerHTML = '<div class="carousel-empty">暂无截图</div>';
       return;
     }
 
@@ -605,7 +534,6 @@ var GAME_META = {};
     startCarousel();
   }
 
-  // ---- 轮播控制 ----
   function goToSlide(index) {
     var slides = $track.querySelectorAll('.carousel-slide');
     var dots  = $dots.querySelectorAll('.dot');
@@ -616,126 +544,170 @@ var GAME_META = {};
     currentSlide = index;
     resetCarouselTimer();
   }
-
   function nextSlide() { goToSlide(currentSlide + 1); }
   function prevSlide() { goToSlide(currentSlide - 1); }
-
   function startCarousel() {
     stopCarousel();
-    var images = getImages(currentGame);
+    var images = getAllImages();
     if (images.length < 2) return;
     carouselTimer = setInterval(nextSlide, CAROUSEL_INTERVAL);
   }
-
   function stopCarousel() {
     if (carouselTimer) { clearInterval(carouselTimer); carouselTimer = null; }
   }
+  function resetCarouselTimer() { stopCarousel(); startCarousel(); }
 
-  function resetCarouselTimer() {
-    stopCarousel();
-    startCarousel();
-  }
-
-  // ---- 渲染图库与备注 ----
+  // ---- 渲染图库 ----
   function renderGallery() {
-    var images = getImages(currentGame);
+    var allImages = getAllImages();
     var searchTerm = $search.value.trim().toLowerCase();
 
-    if (images.length === 0) {
-      $grid.innerHTML = '<div style="text-align:center;padding:60px 0;color:#aaa;font-size:15px;">暂无截图，请将图片放入 img/games/' + currentGame + '/ 目录</div>';
+    // 根据模式筛选
+    var filtered = [];
+    allImages.forEach(function(img) {
+      var note = getNote(img.gameId, img.filename);
+
+      if (currentMode === 'search') {
+        // 搜索模式：按备注关键词过滤
+        if (searchTerm) {
+          var searchable = [
+            (note.outfitCode || ''),
+            (note.cameraParams || ''),
+            (note.themeWords || ''),
+            (note.customNotes || '')
+          ].join(' ').toLowerCase();
+          if (searchable.indexOf(searchTerm) === -1) return;
+        }
+        filtered.push(img);
+      } else {
+        // 最近模式：按文件名排序取最新
+        filtered.push(img);
+      }
+    });
+
+    // 最近模式：按文件名排序（日期前缀），取前 RECENT_COUNT
+    if (currentMode === 'recent') {
+      filtered.sort(function(a, b) {
+        return b.filename.localeCompare(a.filename);
+      });
+      filtered = filtered.slice(0, RECENT_COUNT);
+    }
+
+    // 渲染
+    if (filtered.length === 0) {
+      $grid.innerHTML = '<div style="text-align:center;padding:60px 0;color:#aaa;font-size:15px;">' +
+        (currentMode === 'search' ? '未找到匹配的图片' : '暂无截图') + '</div>';
       $statInfo.textContent = '共 0 张';
       return;
     }
 
     var html = '';
-    var visibleCount = 0;
+    filtered.forEach(function(img) {
+      var note = getNote(img.gameId, img.filename);
+      var hasNotes = hasNote(img.gameId, img.filename);
 
-    images.forEach(function(img) {
-      var note = getNote(currentGame, img.filename);
-      var fromFile = hasFileNote(currentGame, img.filename);
-
-      // 搜索过滤
-      if (searchTerm) {
-        var searchable = [
-          (note.outfitCode || ''),
-          (note.cameraParams || ''),
-          (note.themeWords || ''),
-          (note.customNotes || '')
-        ].join(' ').toLowerCase();
-        if (searchable.indexOf(searchTerm) === -1) {
-          html += '<div class="gallery-card hidden" data-filename="' + img.filename + '">';
-          html += '</div>';
-          return;
-        }
-      }
-      visibleCount++;
-
-      html += '<div class="gallery-card" data-filename="' + img.filename + '">';
+      html += '<div class="gallery-card" data-game="' + img.gameId + '" data-filename="' + img.filename + '">';
       html += '  <div class="img-wrap" data-src="' + img.src + '">';
       html += '    <img src="' + img.src + '" alt="' + img.filename + '" loading="lazy" onerror="this.onerror=null;this.parentElement.innerHTML=\'<div class=placeholder>📷 ' + img.filename + '</div>\'" />';
       html += '  </div>';
       html += '  <div class="notes-area">';
       html += '    <div class="filename">' + img.filename + '</div>';
-      // 搭配码
-      html += '    <div class="note-field">';
-      html += '      <label>搭配码</label>';
-      html += '      <input type="text" class="note-input" data-field="outfitCode" value="' + escAttr(note.outfitCode || '') + '" placeholder="null" />';
-      html += '    </div>';
-      // 镜头参数
-      html += '    <div class="note-field">';
-      html += '      <label>镜头参数</label>';
-      html += '      <input type="text" class="note-input" data-field="cameraParams" value="' + escAttr(note.cameraParams || '') + '" placeholder="null" />';
-      html += '    </div>';
-      // 主题词
-      html += '    <div class="note-field">';
-      html += '      <label>主题词</label>';
-      html += '      <input type="text" class="note-input" data-field="themeWords" value="' + escAttr(note.themeWords || '') + '" placeholder="null" />';
-      html += '    </div>';
-      // 自定义备注
-      html += '    <div class="note-field">';
-      html += '      <label>自定义备注</label>';
-      html += '      <textarea class="note-input" data-field="customNotes" rows="2" placeholder="输入自定义备注…">' + escHtml(note.customNotes || '') + '</textarea>';
-      html += '    </div>';
-      // YAML 来源提示
-      if (fromFile) {
-        html += '    <div class="yaml-source-hint">📄 来自 <a href="{{ site.baseurl }}/_data/notes.yml" target="_blank">_data/notes.yml</a></div>';
+      // 眼睛图标
+      html += '    <div style="text-align:center;padding:6px 0;">';
+      if (hasNotes) {
+        html += '      <span class="eye-btn" style="cursor:pointer;font-size:22px;opacity:0.7;transition:opacity 0.2s;" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0.7">👁️</span>';
       } else {
-        html += '    <div class="yaml-source-hint">✏️ 编辑 <a href="{{ site.baseurl }}/_data/notes.yml" target="_blank">_data/notes.yml</a> 可永久保存备注</div>';
+        html += '      <span style="font-size:12px;color:#ccc;">暂无备注</span>';
       }
+      html += '    </div>';
       html += '  </div>';
       html += '</div>';
     });
 
     $grid.innerHTML = html;
-    $statInfo.textContent = '共 ' + images.length + ' 张' + (searchTerm ? '，匹配 ' + visibleCount + ' 张' : '');
-
-    // 绑定备注输入事件
-    $grid.querySelectorAll('.note-input').forEach(function(el) {
-      el.addEventListener('input', function() {
-        var card = this.closest('.gallery-card');
-        var filename = card.getAttribute('data-filename');
-        var field = this.getAttribute('data-field');
-        setNote(currentGame, filename, field, this.value || null);
-      });
-    });
+    var totalInfo = '共 ' + allImages.length + ' 张';
+    if (currentMode === 'search' && searchTerm) {
+      totalInfo += '，匹配 ' + filtered.length + ' 张';
+    } else if (currentMode === 'recent') {
+      totalInfo += '，展示最近 ' + filtered.length + ' 张';
+    }
+    $statInfo.textContent = totalInfo;
 
     // 绑定大图预览
     $grid.querySelectorAll('.img-wrap').forEach(function(wrap) {
       wrap.addEventListener('click', function() {
         var src = this.getAttribute('data-src');
         if (src) {
-          $modalImg.src = src;
-          $modal.classList.add('open');
+          $imgModalImg.src = src;
+          $imgModal.classList.add('open');
         }
+      });
+    });
+
+    // 绑定眼睛按钮 -> 备注悬浮窗
+    $grid.querySelectorAll('.eye-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        var card = this.closest('.gallery-card');
+        var gameId = card.getAttribute('data-game');
+        var filename = card.getAttribute('data-filename');
+        var note = getNote(gameId, filename);
+
+        var html = '<div style="margin-bottom:14px;font-weight:600;font-size:15px;color:#333;word-break:break-all;">📄 ' + filename + '</div>';
+        var fields = [
+          { label: '🎀 搭配码', key: 'outfitCode', value: note.outfitCode },
+          { label: '📷 镜头参数', key: 'cameraParams', value: note.cameraParams },
+          { label: '🏷️ 主题词', key: 'themeWords', value: note.themeWords },
+          { label: '📝 自定义备注', key: 'customNotes', value: note.customNotes }
+        ];
+        fields.forEach(function(f) {
+          var val = f.value || '';
+          html += '<div style="margin-bottom:12px;padding:10px 12px;background:#f8f9fa;border-radius:8px;border:1px solid #eee;">';
+          html += '  <div style="font-size:11px;font-weight:600;color:#888;margin-bottom:4px;text-transform:uppercase;letter-spacing:0.3px;">' + f.label + '</div>';
+          html += '  <div style="font-size:14px;color:#333;word-break:break-all;min-height:20px;">' + (val || '<span style="color:#ccc">null</span>') + '</div>';
+          html += '  <div style="text-align:right;margin-top:4px;">';
+          html += '    <button class="copy-btn" data-text="' + escAttr(val) + '" style="padding:2px 10px;border:1px solid #ddd;border-radius:4px;background:#fff;cursor:pointer;font-size:12px;color:#888;transition:all 0.2s;" onmouseover="this.style.borderColor=\'#e74c3c\';this.style.color=\'#e74c3c\'" onmouseout="this.style.borderColor=\'#ddd\';this.style.color=\'#888\'">📋 复制</button>';
+          html += '  </div>';
+          html += '</div>';
+        });
+
+        $noteModalContent.innerHTML = html;
+
+        // 绑定复制按钮
+        $noteModalContent.querySelectorAll('.copy-btn').forEach(function(btn) {
+          btn.addEventListener('click', function() {
+            var text = this.getAttribute('data-text');
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(text).then(function() {
+                var orig = this.textContent;
+                this.textContent = '✅ 已复制';
+                var self = this;
+                setTimeout(function() { self.textContent = orig; }, 1500);
+              }.bind(this)).catch(function() {});
+            } else {
+              // Fallback
+              var ta = document.createElement('textarea');
+              ta.value = text;
+              document.body.appendChild(ta);
+              ta.select();
+              document.execCommand('copy');
+              document.body.removeChild(ta);
+              var orig = this.textContent;
+              this.textContent = '✅ 已复制';
+              var self = this;
+              setTimeout(function() { self.textContent = orig; }, 1500);
+            }
+          });
+        });
+
+        $noteModal.classList.add('open');
       });
     });
   }
 
-  // ---- 工具：HTML 转义 ----
-  function escAttr(s) { return s.replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-  function escHtml(s) { return s.replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
+  // ---- 工具 ----
+  function escAttr(s) { return String(s).replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
-  // ---- 全部渲染 ----
+  // ---- 渲染全部 ----
   function renderAll() {
     renderCarousel();
     renderGallery();
@@ -743,14 +715,21 @@ var GAME_META = {};
 
   // ---- 初始化 ----
   function init() {
-    var gameIds = Object.keys(GAME_META);
-    if (gameIds.length === 0) return;
-    var defaultGame = gameIds[0];
-    for (var i = 0; i < gameIds.length; i++) {
-      if (getImages(gameIds[i]).length > 0) { defaultGame = gameIds[i]; break; }
-    }
-    currentGame = defaultGame;
-    renderTabs();
+    // 模式切换
+    var modeTabs = document.getElementById('modeTabs');
+    modeTabs.addEventListener('click', function(e) {
+      var tab = e.target.closest('.game-tab');
+      if (!tab) return;
+      var mode = tab.getAttribute('data-mode');
+      if (mode === currentMode) return;
+      currentMode = mode;
+      modeTabs.querySelectorAll('.game-tab').forEach(function(t) {
+        t.classList.toggle('active', t.getAttribute('data-mode') === mode);
+      });
+      // 搜索模式显示搜索框
+      document.getElementById('searchMode').style.display = mode === 'search' ? 'block' : 'none';
+      renderGallery();
+    });
 
     // 导航按钮
     $prevBtn.addEventListener('click', function(e) { e.stopPropagation(); prevSlide(); });
@@ -759,23 +738,29 @@ var GAME_META = {};
     // 搜索防抖
     var searchTimer = null;
     $search.addEventListener('input', function() {
+      if (currentMode !== 'search') { currentMode = 'search'; }
       if (searchTimer) clearTimeout(searchTimer);
       searchTimer = setTimeout(renderGallery, 200);
     });
 
-    // 模态框关闭
-    $modalClose.addEventListener('click', function() { $modal.classList.remove('open'); });
-    $modal.addEventListener('click', function(e) {
-      if (e.target === $modal) $modal.classList.remove('open');
-    });
-    document.addEventListener('keydown', function(e) {
-      if (e.key === 'Escape') $modal.classList.remove('open');
+    // 大图模态框关闭
+    $imgModalClose.addEventListener('click', function() { $imgModal.classList.remove('open'); });
+    $imgModal.addEventListener('click', function(e) {
+      if (e.target === $imgModal) $imgModal.classList.remove('open');
     });
 
-    // 键盘控制轮播
+    // 备注悬浮窗关闭
+    $noteModalClose.addEventListener('click', function() { $noteModal.classList.remove('open'); });
+    $noteModal.addEventListener('click', function(e) {
+      if (e.target === $noteModal) $noteModal.classList.remove('open');
+    });
+
+    // ESC 关闭所有模态框
     document.addEventListener('keydown', function(e) {
-      if (e.key === 'ArrowLeft' && $modal.classList.contains('open')) return;
-      if (e.key === 'ArrowRight' && $modal.classList.contains('open')) return;
+      if (e.key === 'Escape') {
+        $imgModal.classList.remove('open');
+        $noteModal.classList.remove('open');
+      }
       if (e.key === 'ArrowLeft') prevSlide();
       if (e.key === 'ArrowRight') nextSlide();
     });
