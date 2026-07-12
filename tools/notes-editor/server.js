@@ -29,9 +29,6 @@ const PORT = 3456;
 
 function loadConfig() {
   const defaults = {
-    rcloneRemote: 'r2',
-    rcloneBucket: 'game-screenshots',
-    publicUrlPrefix: 'https://pub-xxxxx.r2.dev',
     games: ['nikki', 'ff14']
   };
   try {
@@ -111,12 +108,12 @@ function writeNotes(data) {
 // ============================================================
 // HTTP 服务器 — 前端界面
 // ============================================================
-function serveHTML(config, r2Images, existingNotes) {
-  // 合并 R2 图片与现有备注
+function serveHTML(config, localImages, existingNotes) {
+  // 合并本地图片与现有备注
   const games = {};
-  const allGameIds = [...new Set([...config.games, ...Object.keys(r2Images), ...Object.keys(existingNotes)])];
+  const allGameIds = [...new Set([...config.games, ...Object.keys(localImages), ...Object.keys(existingNotes)])];
   for (const gameId of allGameIds) {
-    const images = r2Images[gameId] || [];
+    const images = localImages[gameId] || [];
     const notes = existingNotes[gameId] || {};
     games[gameId] = images.map(img => {
       const note = notes[img.filename] || {};
@@ -405,7 +402,7 @@ function render() {
     contentHtml += '<div class="game-content' + active + '" id="content-' + id + '">';
 
     if (images.length === 0) {
-      contentHtml += '<div class="empty-state">📭 暂无截图<br>请先将图片上传到 R2 的 ' + id + '/ 目录</div>';
+      contentHtml += '<div class="empty-state">📭 暂无截图<br>请将图片放入 img/games/' + id + '/ 目录</div>';
     } else {
       contentHtml += '<div class="gallery-grid">';
       images.forEach(function(img) {

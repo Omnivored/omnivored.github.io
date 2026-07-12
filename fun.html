@@ -343,15 +343,15 @@ body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helv
 
 <!-- ============================================================ -->
 <!-- 数据层：由 Liquid 在构建时渲染为 JavaScript                    -->
-<!-- 数据来源（优先级从高到低）：                                  -->
-<!--   1. _data/notes.yml 中的 src 字段 → R2 CDN URL              -->
+<!-- 数据来源：                                                   -->
+<!--   1. _data/notes.yml 中的图片和备注（src 可选，不填则本地）   -->
 <!--   2. site.static_files 自动发现 → 本地 img/games/ 目录       -->
 <!-- 备注始终从 _data/notes.yml 读取                              -->
 <!-- ============================================================ -->
 <script>
 // ================================================================
 // 第一部分：从 _data/notes.yml 读取图片 + 备注
-// 此文件支持 src 字段指向 R2 CDN 地址，无需将图片存入仓库
+// 图片直接放入 img/games/{游戏名}/ 目录即可自动发现
 // ================================================================
 var NOTES_DATA = {};
 var SCREENSHOT_DATA = {};
@@ -367,10 +367,10 @@ var SCREENSHOT_DATA = {};
     {% assign note = note_entry[1] %}
     // 图片数据
     {% if note.src %}
-      // 有 R2 远程地址
+      // 有远程地址
       var imgSrc = '{{ note.src }}';
     {% else %}
-      // 无远程地址，使用本地路径（需将图片放入 img/games/）
+      // 无远程地址，使用本地路径（将图片放入 img/games/）
       var imgSrc = '{{ site.baseurl }}/img/games/{{ game_id }}/{{ filename }}';
     {% endif %}
     SCREENSHOT_DATA['{{ game_id }}'].push({ "src": imgSrc, "filename": "{{ filename }}" });
