@@ -368,15 +368,16 @@ var SCREENSHOT_DATA = {};
     // 图片数据
     {% if note.src %}
       // 有远程地址
-      var imgSrc = '{{ note.src }}';
+      var imgSrc = {{ note.src | jsonify }};
     {% else %}
       // 无远程地址，使用本地路径（将图片放入 img/games/）
-      var imgSrc = '{{ site.baseurl }}/img/games/{{ game_id }}/{{ filename }}';
+      var imgSrc = {{ site.baseurl | append: '/img/games/' | append: game_id | append: '/' | append: filename | jsonify }};
     {% endif %}
-    SCREENSHOT_DATA['{{ game_id }}'].push({ "src": imgSrc, "filename": "{{ filename }}" });
+    SCREENSHOT_DATA[{{ game_id | jsonify }}].push({ "src": imgSrc, "filename": {{ filename | jsonify }} });
 
     // 备注数据
-    NOTES_DATA['{{ game_id }}']['{{ filename }}'] = {
+    if (!NOTES_DATA[{{ game_id | jsonify }}]) NOTES_DATA[{{ game_id | jsonify }}] = {};
+    NOTES_DATA[{{ game_id | jsonify }}][{{ filename | jsonify }}] = {
       outfitCode: {{ note.outfitCode | default: null | jsonify }},
       cameraParams: {{ note.cameraParams | default: null | jsonify }},
       themeWords: {{ note.themeWords | default: null | jsonify }},
@@ -399,19 +400,19 @@ var SCREENSHOT_DATA = {};
     {% assign parts = file.path | split: '/' %}
     {% assign game_id = parts[parts.size | minus: 2] %}
     {% assign filename = file.name %}
-    {% assign local_path = site.baseurl | append: '/' | append: file.path %}
+    {% assign local_path = site.baseurl | append: file.path %}
     // 如果该图片未被 notes.yml 注册，则用本地路径
-    if (!SCREENSHOT_DATA['{{ game_id }}']) SCREENSHOT_DATA['{{ game_id }}'] = [];
+    if ({{ game_id | jsonify }} && !SCREENSHOT_DATA[{{ game_id | jsonify }}]) SCREENSHOT_DATA[{{ game_id | jsonify }}] = [];
     var alreadyRegistered = false;
-    if (SCREENSHOT_DATA['{{ game_id }}']) {
-      for (var _i = 0; _i < SCREENSHOT_DATA['{{ game_id }}'].length; _i++) {
-        if (SCREENSHOT_DATA['{{ game_id }}'][_i].filename === '{{ filename }}') {
+    if (SCREENSHOT_DATA[{{ game_id | jsonify }}]) {
+      for (var _i = 0; _i < SCREENSHOT_DATA[{{ game_id | jsonify }}].length; _i++) {
+        if (SCREENSHOT_DATA[{{ game_id | jsonify }}][_i].filename === {{ filename | jsonify }}) {
           alreadyRegistered = true; break;
         }
       }
     }
     if (!alreadyRegistered) {
-      SCREENSHOT_DATA['{{ game_id }}'].push({ "src": "{{ local_path }}", "filename": "{{ filename }}" });
+      SCREENSHOT_DATA[{{ game_id | jsonify }}].push({ "src": {{ local_path | jsonify }}, "filename": {{ filename | jsonify }} });
     }
   {% endif %}
 {% endfor %}
